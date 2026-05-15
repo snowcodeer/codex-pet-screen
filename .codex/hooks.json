@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./tools/codex_pet_prompt_hook.py",
+            "timeout": 3,
+            "statusMessage": "Codex pet thinking"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./tools/codex_pet_stop_hook.py",
+            "timeout": 5,
+            "statusMessage": "Dancing Codex pet"
+          }
+        ]
+      }
+    ]
+  }
+}
