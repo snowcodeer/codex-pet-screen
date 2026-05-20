@@ -133,7 +133,7 @@ Notes:
 The BOOT button is activated by running the laptop daemon. The daemon has two actions:
 
 - `improve`: copies selected text, asks `codex exec` to rewrite it as a stronger prompt, puts the result on the clipboard, and pastes it into the active field.
-- `last-result`: summarizes the latest remembered Codex response and sends a short 3-5 line note to the OLED.
+- `last-result`: summarizes the latest remembered Codex response and sends one concise full-screen note to the OLED for about 5 seconds.
 
 The default action is `improve`.
 
@@ -173,7 +173,9 @@ Wi-Fi mode:
 ./tools/prompt_button_daemon.py --no-serial --http-port 8765 --pet-host http://codex-pet-screen.local --button-action last-result
 ```
 
-Then press BOOT. The daemon reads the last response saved by the Codex `Stop` hook, compresses it to fit the 128x64 OLED, and sends it as a full-width note.
+Then press BOOT. The daemon reads the last response saved by the Codex `Stop` hook, compresses it to one 5-line OLED page, and sends it as a full-width note. The note hides the session/context bars while it is displayed.
+
+Generated summaries are cached in `/tmp/codex_pet_last_summary.json`, so pressing BOOT repeatedly for the same Codex result reuses the existing summary instead of calling Codex again.
 
 This mode works best when Codex was launched with hooks enabled:
 
@@ -220,7 +222,7 @@ Restart the daemon after changing permissions.
 
 1. Run `./tools/prompt_button_daemon.py --button-action last-result`.
 2. Press the ESP32-C3 BOOT button.
-3. The OLED should show a compact summary of the latest Codex result.
+3. The OLED should show a concise one-page summary of the latest Codex result for about 5 seconds.
 
 ## Useful Commands
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import hashlib
 import json
 import os
 import subprocess
@@ -19,6 +20,7 @@ BAUD = "115200"
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 USAGE_PATH = "/tmp/codex_pet_usage.json"
 LAST_RESULT_PATH = "/tmp/codex_pet_last_result.txt"
+LAST_SUMMARY_PATH = "/tmp/codex_pet_last_summary.json"
 
 IMPROVER_INSTRUCTIONS = """Rewrite the selected text into a clearer, stronger prompt for Codex.
 
@@ -158,6 +160,25 @@ def compact_lines(text, *, max_lines=5, width=21):
     return "\n".join(lines[:max_lines])
 
 
+def cached_summary(cache_key):
+    try:
+        with open(LAST_SUMMARY_PATH, "r", encoding="utf-8") as summary_file:
+            cache = json.load(summary_file)
+        if cache.get("key") == cache_key and cache.get("summary"):
+            return compact_lines(str(cache["summary"]))
+    except (OSError, TypeError, json.JSONDecodeError):
+        pass
+    return ""
+
+
+def save_summary(cache_key, summary):
+    try:
+        with open(LAST_SUMMARY_PATH, "w", encoding="utf-8") as summary_file:
+            json.dump({"key": cache_key, "summary": summary}, summary_file)
+    except OSError:
+        pass
+
+
 def summarize_last_result():
     try:
         text = open(LAST_RESULT_PATH, "r", encoding="utf-8").read().strip()
@@ -176,9 +197,14 @@ def summarize_last_result():
         )
         text = result.stdout.strip() or "No recent Codex result yet"
 
+    cache_key = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    summary = cached_summary(cache_key)
+    if summary:
+        return summary
+
     prompt = """Summarize this Codex result for a 128x64 OLED screen.
 
-Return exactly 3 to 5 short lines. Each line must be 21 characters or fewer.
+Return exactly 5 short lines. Each line must be 21 characters or fewer.
 Do not use bullets, markdown, emojis, or quotes.
 
 Result:
@@ -215,7 +241,9 @@ Result:
 
     if result.returncode != 0 or not summary:
         summary = compact_lines(text)
-    return compact_lines(summary)
+    summary = compact_lines(summary)
+    save_summary(cache_key, summary)
+    return summary
 
 
 def handle_improve_button(fd):
@@ -251,7 +279,6 @@ def handle_improve_button(fd):
 
 
 def handle_last_result_button(fd):
-    restore_usage(fd)
     send_pet_command(fd, "think")
     summary = summarize_last_result()
     send_pet_command(fd, f"note {summary}")

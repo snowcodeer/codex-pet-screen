@@ -18,6 +18,9 @@ constexpr uint8_t kSdaPin = 3;
 constexpr uint8_t kSclPin = 4;
 constexpr uint8_t kButtonPin = 0;
 constexpr uint32_t kBaud = 115200;
+constexpr uint8_t kNoteMaxLines = 5;
+constexpr uint8_t kNoteLinesPerPage = 5;
+constexpr uint32_t kNoteHoldMs = 5000;
 
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C oled(U8G2_R0, U8X8_PIN_NONE);
 
@@ -40,6 +43,11 @@ bool lastButtonState = HIGH;
 int8_t sessionPercent = -1;
 int8_t contextPercent = -1;
 bool thinkingMode = false;
+bool noteMode = false;
+uint32_t noteStartedAt = 0;
+uint32_t noteUntil = 0;
+String noteLines[kNoteMaxLines];
+uint8_t noteLineCount = 0;
 
 void drawSparkle(int16_t x, int16_t y) {
   oled.drawPixel(x, y - 2);
@@ -147,6 +155,7 @@ void drawUsageBars() {
 }
 
 void renderIdle() {
+  noteMode = false;
   oled.clearBuffer();
   const int16_t bob = idleFrame % 2;
   drawSparkle(28, 15 + (idleFrame % 2));
@@ -162,7 +171,20 @@ void renderIdle() {
   oled.sendBuffer();
 }
 
+void renderNote() {
+  oled.clearBuffer();
+  oled.setFont(u8g2_font_6x10_tf);
+  uint8_t y = 10;
+
+  for (uint8_t i = 0; i < kNoteLinesPerPage && i < noteLineCount; ++i) {
+    oled.drawStr(1, y, noteLines[i].c_str());
+    y += 11;
+  }
+  oled.sendBuffer();
+}
+
 void dance() {
+  noteMode = false;
   thinkingMode = false;
   static const int8_t xs[] = {36, 45, 40, 32, 47, 40, 36, 44};
   static const int8_t ys[] = {7, 3, 8, 4, 8, 3, 7, 5};
@@ -184,6 +206,7 @@ void dance() {
 }
 
 void showThinking() {
+  noteMode = false;
   thinkingMode = true;
   statusText = "thinking";
   renderIdle();
@@ -195,6 +218,7 @@ void showMessage(String message) {
     message = "hello from laptop";
   }
   thinkingMode = false;
+  noteMode = false;
   statusText = message;
   oled.clearBuffer();
   drawPet(4, 6, 1, 0);
@@ -216,30 +240,42 @@ void showNote(String message) {
     message = "No recent result";
   }
   thinkingMode = false;
+  noteMode = true;
+  noteStartedAt = millis();
+  noteUntil = noteStartedAt + kNoteHoldMs;
+  noteLineCount = 0;
   statusText = message;
-  oled.clearBuffer();
-  oled.setFont(u8g2_font_6x10_tf);
-  uint8_t y = 10;
-  while (message.length() > 0 && y <= 54) {
+
+  while (message.length() > 0 && noteLineCount < kNoteMaxLines) {
+    message.trim();
     int newline = message.indexOf('\n');
     uint8_t count = message.length() > 21 ? 21 : message.length();
     if (newline >= 0 && newline < count) {
       count = newline;
+    } else if (count == 21 && message.length() > 21) {
+      int lastSpace = message.lastIndexOf(' ', count);
+      if (lastSpace > 0) {
+        count = lastSpace;
+      }
     }
 
     String line = message.substring(0, count);
     line.trim();
-    oled.drawStr(1, y, line.c_str());
+    if (line.length() > 0) {
+      noteLines[noteLineCount++] = line;
+    }
 
     if (newline >= 0 && newline <= count) {
       message.remove(0, newline + 1);
     } else {
       message.remove(0, count);
     }
-    y += 11;
   }
-  drawUsageBars();
-  oled.sendBuffer();
+
+  if (noteLineCount == 0) {
+    noteLines[noteLineCount++] = "No recent result";
+  }
+  renderNote();
 }
 
 void handleCommand(String line);
@@ -348,13 +384,16 @@ void handleCommand(String line) {
     if (split > 0) {
       sessionPercent = constrain(command.substring(6, split).toInt(), 0, 100);
       contextPercent = constrain(command.substring(split + 1).toInt(), 0, 100);
-      renderIdle();
+      if (!noteMode) {
+        renderIdle();
+      }
     }
   } else if (command.startsWith("msg ")) {
     showMessage(line.substring(4));
   } else if (command.startsWith("note ")) {
     showNote(line.substring(5));
   } else if (command == "idle") {
+    noteMode = false;
     thinkingMode = false;
     statusText = "waiting for codex";
     renderIdle();
@@ -386,7 +425,7 @@ void loop() {
     if (c == '\n' || c == '\r') {
       handleCommand(serialLine);
       serialLine = "";
-    } else if (serialLine.length() < 96) {
+    } else if (serialLine.length() < 512) {
       serialLine += c;
     }
   }
@@ -399,9 +438,18 @@ void loop() {
   }
   lastButtonState = buttonState;
 
+  if (noteMode && static_cast<int32_t>(millis() - noteUntil) >= 0) {
+    noteMode = false;
+    renderIdle();
+  }
+
   if (millis() - lastIdleFrame > 800) {
     lastIdleFrame = millis();
     idleFrame = (idleFrame + 1) % 8;
-    renderIdle();
+    if (noteMode) {
+      renderNote();
+    } else {
+      renderIdle();
+    }
   }
 }
