@@ -25,8 +25,9 @@ def is_enabled() -> bool:
     return os.environ.get("CODEX_PET_HOOK", "0") == "1"
 
 
-def latest_token_count(transcript_path: Path):
-    latest = None
+def latest_usage_snapshot(transcript_path: Path):
+    latest_rate_limits = None
+    latest_info = None
     try:
         with transcript_path.open("r", encoding="utf-8") as transcript:
             for line in transcript:
@@ -36,34 +37,70 @@ def latest_token_count(transcript_path: Path):
                     continue
                 payload = event.get("payload") or {}
                 if payload.get("type") == "token_count":
-                    latest = payload
+                    if payload.get("rate_limits"):
+                        latest_rate_limits = payload.get("rate_limits")
+                    if payload.get("info"):
+                        latest_info = payload.get("info")
     except OSError:
         return None
-    return latest
+    if latest_rate_limits is None and latest_info is None:
+        return None
+    return {"rate_limits": latest_rate_limits, "info": latest_info}
 
 
-def usage_from_event(event):
+def token_total(usage):
+    if not isinstance(usage, dict):
+        return None
+    if isinstance(usage.get("total_tokens"), int):
+        return usage["total_tokens"]
+
+    input_tokens = usage.get("input_tokens")
+    output_tokens = usage.get("output_tokens")
+    if isinstance(input_tokens, int) and isinstance(output_tokens, int):
+        return input_tokens + output_tokens
+    return None
+
+
+def usage_from_event(event, previous=None):
     if not event:
         return None
 
-    session_percent = None
+    previous = previous or {}
+    session_percent = previous.get("session")
     rate_limits = event.get("rate_limits") or {}
     primary_limit = rate_limits.get("primary") or {}
     if isinstance(primary_limit.get("used_percent"), (int, float)):
         session_percent = round(primary_limit["used_percent"])
 
-    context_percent = None
+    context_percent = previous.get("context")
     info = event.get("info") or {}
-    usage = info.get("last_token_usage") or info.get("total_token_usage") or {}
     context_window = info.get("model_context_window")
-    total_tokens = usage.get("total_tokens")
-    if isinstance(total_tokens, int) and isinstance(context_window, int) and context_window > 0:
-        context_percent = round(total_tokens * 100 / context_window)
+    current_tokens = token_total(info.get("last_token_usage"))
+
+    if current_tokens is None:
+        cumulative_tokens = token_total(info.get("total_token_usage"))
+        if (
+            isinstance(cumulative_tokens, int)
+            and isinstance(context_window, int)
+            and 0 <= cumulative_tokens <= context_window
+        ):
+            current_tokens = cumulative_tokens
+
+    if isinstance(current_tokens, int) and isinstance(context_window, int) and context_window > 0:
+        context_percent = round(current_tokens * 100 / context_window)
 
     if session_percent is None or context_percent is None:
         return None
 
     return max(0, min(100, session_percent)), max(0, min(100, context_percent))
+
+
+def previous_usage():
+    try:
+        usage = json.loads(USAGE_PATH.read_text(encoding="utf-8"))
+        return {"session": int(usage["session"]), "context": int(usage["context"])}
+    except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+        return {}
 
 
 def send_pet(*parts):
@@ -153,7 +190,7 @@ def main() -> int:
 
     transcript = hook_input.get("transcript_path")
     if transcript:
-        usage = usage_from_event(latest_token_count(Path(transcript)))
+        usage = usage_from_event(latest_usage_snapshot(Path(transcript)), previous_usage())
         if usage:
             log(f"Sending usage {usage[0]} {usage[1]}")
             try:
