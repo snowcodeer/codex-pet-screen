@@ -2,7 +2,7 @@
 
 A tiny ESP32-C3 + SSD1306 OLED desk pet for Codex.
 
-The pet lives on a 128x64 OLED, reacts to Codex hooks, shows session/context usage bars, dances when a prompt finishes, plays a cute laptop sound, and uses the ESP32-C3 BOOT button as a prompt-improver trigger for selected text.
+The pet lives on a 128x64 OLED, reacts to Codex hooks, shows session/context usage bars, dances when a prompt finishes, plays a cute laptop sound, and uses the ESP32-C3 BOOT button as a prompt helper.
 
 ## Quick Start
 
@@ -48,7 +48,7 @@ Flash after creating the Wi-Fi config:
 pio run -e codex-pet-screen -t upload
 ```
 
-Run the laptop daemon in Wi-Fi mode:
+Run the laptop daemon in Wi-Fi mode with the default prompt-improver action:
 
 ```sh
 ./tools/prompt_button_daemon.py --no-serial --http-port 8765 --pet-host http://codex-pet-screen.local
@@ -60,11 +60,18 @@ If mDNS does not resolve, use the OLED-displayed IP address instead:
 ./tools/prompt_button_daemon.py --no-serial --http-port 8765 --pet-host http://192.168.0.123
 ```
 
+To make BOOT show the last Codex result instead:
+
+```sh
+./tools/prompt_button_daemon.py --no-serial --http-port 8765 --pet-host http://192.168.0.123 --button-action last-result
+```
+
 Send commands over Wi-Fi:
 
 ```sh
 CODEX_PET_HOST=http://codex-pet-screen.local ./tools/codex_pet.py dance
 CODEX_PET_HOST=http://codex-pet-screen.local ./tools/codex_pet.py usage 30 12
+CODEX_PET_HOST=http://codex-pet-screen.local ./tools/codex_pet.py note "LAST RESULT\nBuild passed\nPushed to main"
 ```
 
 Enable Codex hooks over Wi-Fi:
@@ -96,7 +103,7 @@ The default upload and monitor port is `/dev/cu.usbmodem101`.
 Project-local hooks live in `.codex/hooks.json`.
 
 - `UserPromptSubmit`: sends `think` so the pet enters thinking mode.
-- `Stop`: updates usage bars, dances, and plays `/tmp/codex_pet_cute.wav`.
+- `Stop`: updates usage bars, remembers the last Codex result, dances, and plays `/tmp/codex_pet_cute.wav`.
 
 After cloning, restart Codex in this repo and run `/hooks` if Codex asks you to trust the hooks.
 
@@ -143,6 +150,22 @@ For Wi-Fi-only mode, use:
 ./tools/prompt_button_daemon.py --no-serial --http-port 8765 --pet-host http://codex-pet-screen.local
 ```
 
+To change what BOOT does, pass `--button-action`:
+
+```sh
+# Improve selected text and paste it back.
+./tools/prompt_button_daemon.py --button-action improve
+
+# Show the last Codex result as a short OLED summary.
+./tools/prompt_button_daemon.py --button-action last-result
+```
+
+In Wi-Fi mode:
+
+```sh
+./tools/prompt_button_daemon.py --no-serial --http-port 8765 --pet-host http://codex-pet-screen.local --button-action last-result
+```
+
 To keep it running in the background:
 
 ```sh
@@ -155,9 +178,9 @@ To stop the background daemon:
 pkill -f prompt_button_daemon.py
 ```
 
-Then select rough prompt text anywhere and press BOOT. The daemon copies the selection, asks `codex exec` to improve it, puts the improved prompt on the clipboard, and pastes it into the active field.
+Then press BOOT. With `--button-action improve`, the daemon copies the selection, asks `codex exec` to improve it, puts the improved prompt on the clipboard, and pastes it into the active field. With `--button-action last-result`, the daemon summarizes the latest remembered Codex response and sends it to the OLED.
 
-The daemon must stay running because the ESP32 sends button events over USB serial to the laptop. The ESP32 does not run the prompt improver by itself.
+The daemon must stay running because the ESP32 sends button events to the laptop over USB serial or Wi-Fi HTTP. The ESP32 does not run Codex actions by itself.
 
 macOS may require Accessibility permission for the terminal app running the daemon.
 
@@ -186,5 +209,6 @@ If nothing is selected, the daemon falls back to the current clipboard text. If 
 ./tools/codex_pet.py think
 ./tools/codex_pet.py dance
 ./tools/codex_pet.py usage 30 12
+./tools/codex_pet.py note "LAST RESULT\nBuild passed\nPushed to main"
 ./tools/codex_pet.py idle
 ```

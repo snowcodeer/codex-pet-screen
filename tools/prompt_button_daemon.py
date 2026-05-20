@@ -18,6 +18,7 @@ DEFAULT_PET_HOST = os.environ.get("CODEX_PET_HOST", "")
 BAUD = "115200"
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 USAGE_PATH = "/tmp/codex_pet_usage.json"
+LAST_RESULT_PATH = "/tmp/codex_pet_last_result.txt"
 
 IMPROVER_INSTRUCTIONS = """Rewrite the selected text into a clearer, stronger prompt for Codex.
 
@@ -135,7 +136,89 @@ def improve_prompt(selected_text):
     return improved, ""
 
 
-def handle_button(fd):
+def compact_lines(text, *, max_lines=5, width=21):
+    words = " ".join(text.replace("\n", " ").split()).split(" ")
+    lines = []
+    current = ""
+    for word in words:
+        if not word:
+            continue
+        if len(word) > width:
+            word = word[:width]
+        candidate = word if not current else f"{current} {word}"
+        if len(candidate) <= width:
+            current = candidate
+            continue
+        lines.append(current)
+        current = word
+        if len(lines) >= max_lines:
+            break
+    if current and len(lines) < max_lines:
+        lines.append(current)
+    return "\n".join(lines[:max_lines])
+
+
+def summarize_last_result():
+    try:
+        text = open(LAST_RESULT_PATH, "r", encoding="utf-8").read().strip()
+    except OSError:
+        text = ""
+
+    if not text:
+        result = run(
+            [
+                "git",
+                "log",
+                "-1",
+                "--pretty=format:Last commit %h %s",
+            ],
+            timeout=5,
+        )
+        text = result.stdout.strip() or "No recent Codex result yet"
+
+    prompt = """Summarize this Codex result for a 128x64 OLED screen.
+
+Return exactly 3 to 5 short lines. Each line must be 21 characters or fewer.
+Do not use bullets, markdown, emojis, or quotes.
+
+Result:
+""" + text
+
+    with tempfile.NamedTemporaryFile("r", encoding="utf-8", delete=False) as output_file:
+        output_path = output_file.name
+    try:
+        result = run(
+            [
+                "codex",
+                "exec",
+                "-C",
+                PROJECT_ROOT,
+                "--skip-git-repo-check",
+                "--disable",
+                "codex_hooks",
+                "--output-last-message",
+                output_path,
+                prompt,
+            ],
+            timeout=60,
+        )
+        try:
+            with open(output_path, "r", encoding="utf-8") as final_output:
+                summary = final_output.read().strip()
+        except OSError:
+            summary = ""
+    finally:
+        try:
+            os.unlink(output_path)
+        except OSError:
+            pass
+
+    if result.returncode != 0 or not summary:
+        summary = compact_lines(text)
+    return compact_lines(summary)
+
+
+def handle_improve_button(fd):
     restore_usage(fd)
     send_pet_command(fd, "think")
     selected_text, previous_clipboard, selection_error = copy_selection()
@@ -167,7 +250,22 @@ def handle_button(fd):
         print(f"Improved prompt copied, but paste failed: {paste_error}", file=sys.stderr)
 
 
-def start_http_server(http_port, pet_target):
+def handle_last_result_button(fd):
+    restore_usage(fd)
+    send_pet_command(fd, "think")
+    summary = summarize_last_result()
+    send_pet_command(fd, f"note {summary}")
+    print("Last result shown.")
+
+
+def handle_button(fd, action):
+    if action == "last-result":
+        handle_last_result_button(fd)
+    else:
+        handle_improve_button(fd)
+
+
+def start_http_server(http_port, pet_target, button_action):
     class ButtonHandler(BaseHTTPRequestHandler):
         def do_GET(self):
             path = urlparse(self.path).path
@@ -176,7 +274,7 @@ def start_http_server(http_port, pet_target):
                 self.end_headers()
                 return
             if path == "/button":
-                threading.Thread(target=handle_button, args=(pet_target,), daemon=True).start()
+                threading.Thread(target=handle_button, args=(pet_target, button_action), daemon=True).start()
                 body = b"button accepted\n"
             else:
                 body = b"codex pet button daemon\n"
@@ -202,6 +300,12 @@ def main():
     parser.add_argument("--no-serial", action="store_true", help="Do not open the USB serial port.")
     parser.add_argument("--http-port", type=int, default=DEFAULT_HTTP_PORT)
     parser.add_argument(
+        "--button-action",
+        choices=("improve", "last-result"),
+        default="improve",
+        help="Action to run when BOOT is pressed.",
+    )
+    parser.add_argument(
         "--pet-host",
         default=DEFAULT_PET_HOST,
         help="ESP32 HTTP host/IP for status messages. Can also be set with CODEX_PET_HOST.",
@@ -209,7 +313,7 @@ def main():
     args = parser.parse_args()
 
     pet_target = args.pet_host or None
-    start_http_server(args.http_port, pet_target)
+    start_http_server(args.http_port, pet_target, args.button_action)
 
     if args.no_serial:
         print("Serial listener disabled. Press Ctrl-C to stop.")
@@ -235,7 +339,7 @@ def main():
                 line, buffer = buffer.split(b"\n", 1)
                 text = line.decode("utf-8", errors="replace").strip()
                 if text == "button:prompt_improve":
-                    handle_button(fd)
+                    handle_button(fd, args.button_action)
     finally:
         os.close(fd)
 

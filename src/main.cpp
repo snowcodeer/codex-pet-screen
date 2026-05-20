@@ -210,6 +210,38 @@ void showMessage(String message) {
   oled.sendBuffer();
 }
 
+void showNote(String message) {
+  message.trim();
+  if (message.length() == 0) {
+    message = "No recent result";
+  }
+  thinkingMode = false;
+  statusText = message;
+  oled.clearBuffer();
+  oled.setFont(u8g2_font_6x10_tf);
+  uint8_t y = 10;
+  while (message.length() > 0 && y <= 54) {
+    int newline = message.indexOf('\n');
+    uint8_t count = message.length() > 21 ? 21 : message.length();
+    if (newline >= 0 && newline < count) {
+      count = newline;
+    }
+
+    String line = message.substring(0, count);
+    line.trim();
+    oled.drawStr(1, y, line.c_str());
+
+    if (newline >= 0 && newline <= count) {
+      message.remove(0, newline + 1);
+    } else {
+      message.remove(0, count);
+    }
+    y += 11;
+  }
+  drawUsageBars();
+  oled.sendBuffer();
+}
+
 void handleCommand(String line);
 
 #if CODEX_PET_WIFI_ENABLED
@@ -320,6 +352,8 @@ void handleCommand(String line) {
     }
   } else if (command.startsWith("msg ")) {
     showMessage(line.substring(4));
+  } else if (command.startsWith("note ")) {
+    showNote(line.substring(5));
   } else if (command == "idle") {
     thinkingMode = false;
     statusText = "waiting for codex";

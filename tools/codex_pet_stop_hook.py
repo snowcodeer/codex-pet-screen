@@ -9,6 +9,7 @@ from pathlib import Path
 
 LOG_PATH = Path("/tmp/codex_pet_hook.log")
 USAGE_PATH = Path("/tmp/codex_pet_usage.json")
+LAST_RESULT_PATH = Path("/tmp/codex_pet_last_result.txt")
 CUTE_SOUND = Path("/tmp/codex_pet_cute.wav")
 FALLBACK_DONE_SOUND = Path("/System/Library/Sounds/Purr.aiff")
 
@@ -103,6 +104,42 @@ def previous_usage():
         return {}
 
 
+def latest_agent_message(transcript_path: Path):
+    latest = ""
+    try:
+        with transcript_path.open("r", encoding="utf-8") as transcript:
+            for line in transcript:
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                payload = event.get("payload") or {}
+                if payload.get("type") == "agent_message" and payload.get("message"):
+                    latest = payload["message"]
+                elif event.get("type") == "response_item":
+                    item = payload
+                    if item.get("type") == "message" and item.get("role") == "assistant":
+                        parts = []
+                        for content in item.get("content") or []:
+                            if content.get("type") == "output_text":
+                                parts.append(content.get("text", ""))
+                        if parts:
+                            latest = "\n".join(parts)
+    except OSError:
+        return ""
+    return latest.strip()
+
+
+def remember_last_result(transcript_path: Path):
+    message = latest_agent_message(transcript_path)
+    if not message:
+        return
+    try:
+        LAST_RESULT_PATH.write_text(message, encoding="utf-8")
+    except OSError:
+        pass
+
+
 def send_pet(*parts):
     script = Path(__file__).with_name("codex_pet.py")
     subprocess.run(
@@ -190,7 +227,9 @@ def main() -> int:
 
     transcript = hook_input.get("transcript_path")
     if transcript:
-        usage = usage_from_event(latest_usage_snapshot(Path(transcript)), previous_usage())
+        transcript_path = Path(transcript)
+        remember_last_result(transcript_path)
+        usage = usage_from_event(latest_usage_snapshot(transcript_path), previous_usage())
         if usage:
             log(f"Sending usage {usage[0]} {usage[1]}")
             try:
