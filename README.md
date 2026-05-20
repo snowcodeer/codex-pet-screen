@@ -128,6 +128,40 @@ Notes:
 - On macOS, processes may be blocked from reading files in `~/Documents` or other protected locations by system privacy controls. If you see "Operation not permitted" when Codex invokes hooks, either grant Full Disk Access to the app that launches Codex (System Settings → Privacy & Security → Full Disk Access) or run Codex from a location that isn't protected (for example `/Users/Shared`).
 - If you prefer per-instance hooks, configure a different hook path for each Codex installation instead of sharing this repository's hooks.
 
+### Use From Another Project
+
+You can configure any Codex project to use this same pet without copying the firmware project.
+
+Project-only setup:
+
+```sh
+/Users/nataliechan/Documents/PlatformIO/Projects/codex-pet-screen/tools/setup_codex_pet.py \
+  --scope project \
+  --target /path/to/other/project \
+  --host http://192.168.0.197
+```
+
+Global setup for every Codex project:
+
+```sh
+/Users/nataliechan/Documents/PlatformIO/Projects/codex-pet-screen/tools/setup_codex_pet.py \
+  --scope global \
+  --host http://192.168.0.197
+```
+
+The setup command writes hook config that points back to this repo's hook scripts. It also caches the ESP host in `/tmp/codex_pet_host`, so Codex can reach the screen even when launched from VS Code or another app without `CODEX_PET_HOST`.
+
+After setup, open Codex in the target project and run `/hooks` if Codex asks you to trust the hooks.
+
+To install the bundled setup skill for future Codex sessions:
+
+```sh
+mkdir -p ~/.codex/skills
+cp -R /Users/nataliechan/Documents/PlatformIO/Projects/codex-pet-screen/skills/codex-pet-screen ~/.codex/skills/
+```
+
+Then ask Codex in another project: `Use the codex-pet-screen skill to set up this repo with my OLED pet.`
+
 ## Button Actions
 
 The BOOT button is activated by running the laptop daemon. The daemon has two actions:
