@@ -196,7 +196,7 @@ Wi-Fi mode:
 ./tools/prompt_button_daemon.py --no-serial --http-port 8765 --pet-host http://codex-pet-screen.local --button-action improve
 ```
 
-Then select rough prompt text anywhere and press BOOT. If nothing is selected, the daemon falls back to the current clipboard text. The active terminal input line is cleared before pasting, which works better in terminal-style prompt fields that do not replace selected text on paste. If paste is blocked, the improved prompt remains on the clipboard.
+Then select rough prompt text anywhere and press BOOT. The daemon only improves selected text; if nothing is selected, it asks you to select text instead of using unrelated clipboard contents. The active terminal input line is cleared before pasting, which works better in terminal-style prompt fields that do not replace selected text on paste. If paste is blocked, the improved prompt remains on the clipboard.
 
 With current firmware, this action is triggered by a long BOOT press even when the daemon fallback action is `last-result`.
 

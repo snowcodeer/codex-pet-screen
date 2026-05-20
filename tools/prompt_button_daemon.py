@@ -269,8 +269,6 @@ def handle_improve_button(fd):
     restore_usage(fd)
     send_pet_command(fd, "think")
     selected_text, previous_clipboard, selection_error = copy_selection()
-    if not selected_text.strip():
-        selected_text = previous_clipboard
 
     if not selected_text.strip():
         send_pet_message(fd, "copy/select text")
@@ -278,7 +276,7 @@ def handle_improve_button(fd):
         return
 
     if selection_error:
-        print(f"Using clipboard fallback: {selection_error}", file=sys.stderr)
+        print(f"Using selected text despite copy warning: {selection_error}", file=sys.stderr)
 
     improved, improve_error = improve_prompt(selected_text)
     if not improved:
