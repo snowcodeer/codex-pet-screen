@@ -171,7 +171,7 @@ The BOOT button is activated by running the laptop daemon. The firmware sends tw
 
 The daemon also supports a fallback action for older firmware or manual `/button` requests:
 
-- `improve`: copies selected text, asks `codex exec` to rewrite it as a stronger prompt, puts the result on the clipboard, clears the active input with `Cmd-A` + `Delete`, and pastes the improved prompt.
+- `improve`: copies selected text, asks `codex exec` to rewrite it as a stronger prompt, puts the result on the clipboard, clears the active terminal input with `Ctrl-A` + `Ctrl-K`, and pastes the improved prompt.
 - `last-result`: summarizes the latest remembered Codex response and sends one concise full-screen note to the OLED for about 5 seconds.
 
 The default fallback action is `improve`, but current firmware sends explicit short/long press actions.
@@ -196,7 +196,7 @@ Wi-Fi mode:
 ./tools/prompt_button_daemon.py --no-serial --http-port 8765 --pet-host http://codex-pet-screen.local --button-action improve
 ```
 
-Then select rough prompt text anywhere and press BOOT. If nothing is selected, the daemon falls back to the current clipboard text. The active input is cleared before pasting, which works better in terminal-style prompt fields that do not replace selected text on paste. If paste is blocked, the improved prompt remains on the clipboard.
+Then select rough prompt text anywhere and press BOOT. If nothing is selected, the daemon falls back to the current clipboard text. The active terminal input line is cleared before pasting, which works better in terminal-style prompt fields that do not replace selected text on paste. If paste is blocked, the improved prompt remains on the clipboard.
 
 With current firmware, this action is triggered by a long BOOT press even when the daemon fallback action is `last-result`.
 

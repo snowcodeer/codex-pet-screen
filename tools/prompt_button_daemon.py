@@ -96,9 +96,9 @@ def write_clipboard(text):
 def replace_field_with_clipboard():
     script = """
 tell application "System Events"
-    keystroke "a" using command down
+    keystroke "a" using control down
     delay 0.05
-    key code 51
+    keystroke "k" using control down
     delay 0.05
     keystroke "v" using command down
 end tell
