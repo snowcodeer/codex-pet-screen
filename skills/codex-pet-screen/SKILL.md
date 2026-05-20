@@ -50,6 +50,8 @@ Use this skill when the user wants a project to drive a Codex Pet Screen: thinki
 
    Use `--button-action improve` for selected-text prompt improvement.
 
+   Current firmware sends explicit button actions: short press shows `last-result`; long press, about 1 second, runs `improve`. The daemon's `--button-action` is only the fallback for older firmware or manual `/button` requests.
+
 5. Ask the user to open Codex in the target project and run `/hooks` if Codex asks for trust.
 
 6. Verify:

@@ -21,6 +21,7 @@ constexpr uint32_t kBaud = 115200;
 constexpr uint8_t kNoteMaxLines = 5;
 constexpr uint8_t kNoteLinesPerPage = 5;
 constexpr uint32_t kNoteHoldMs = 5000;
+constexpr uint32_t kLongPressMs = 900;
 
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C oled(U8G2_R0, U8X8_PIN_NONE);
 
@@ -40,6 +41,7 @@ String statusText = "waiting for codex";
 uint32_t lastIdleFrame = 0;
 uint8_t idleFrame = 0;
 bool lastButtonState = HIGH;
+uint32_t buttonPressedAt = 0;
 int8_t sessionPercent = -1;
 int8_t contextPercent = -1;
 bool thinkingMode = false;
@@ -351,15 +353,19 @@ void serviceWifi() {
   }
 }
 
-void notifyButtonCallback() {
+void notifyButtonCallback(const char *action) {
   const char *url = CODEX_PET_BUTTON_URL;
   if (WiFi.status() != WL_CONNECTED || url[0] == '\0') {
     return;
   }
 
+  String callback = String(url);
+  callback += callback.indexOf('?') >= 0 ? "&action=" : "?action=";
+  callback += action;
+
   HTTPClient http;
   http.setTimeout(1200);
-  if (http.begin(url)) {
+  if (http.begin(callback)) {
     http.GET();
     http.end();
   }
@@ -367,7 +373,7 @@ void notifyButtonCallback() {
 #else
 void setupWifiServer() {}
 void serviceWifi() {}
-void notifyButtonCallback() {}
+void notifyButtonCallback(const char *) {}
 #endif
 
 void handleCommand(String line) {
@@ -432,9 +438,18 @@ void loop() {
 
   const bool buttonState = digitalRead(kButtonPin);
   if (lastButtonState == HIGH && buttonState == LOW) {
-    Serial.println("button:prompt_improve");
-    showThinking();
-    notifyButtonCallback();
+    buttonPressedAt = millis();
+  } else if (lastButtonState == LOW && buttonState == HIGH) {
+    const uint32_t pressMs = millis() - buttonPressedAt;
+    if (pressMs >= kLongPressMs) {
+      Serial.println("button:prompt_improve");
+      showMessage("improving prompt");
+      notifyButtonCallback("improve");
+    } else {
+      Serial.println("button:last_result");
+      showThinking();
+      notifyButtonCallback("last-result");
+    }
   }
   lastButtonState = buttonState;
 

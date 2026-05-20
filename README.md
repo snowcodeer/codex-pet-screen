@@ -164,12 +164,17 @@ Then ask Codex in another project: `Use the codex-pet-screen skill to set up thi
 
 ## Button Actions
 
-The BOOT button is activated by running the laptop daemon. The daemon has two actions:
+The BOOT button is activated by running the laptop daemon. The firmware sends two press types:
+
+- Short press: shows the latest Codex result summary.
+- Long press, about 1 second: improves selected text and pastes it back.
+
+The daemon also supports a fallback action for older firmware or manual `/button` requests:
 
 - `improve`: copies selected text, asks `codex exec` to rewrite it as a stronger prompt, puts the result on the clipboard, and pastes it into the active field.
 - `last-result`: summarizes the latest remembered Codex response and sends one concise full-screen note to the OLED for about 5 seconds.
 
-The default action is `improve`.
+The default fallback action is `improve`, but current firmware sends explicit short/long press actions.
 
 ### Prompt Improver
 
@@ -193,6 +198,8 @@ Wi-Fi mode:
 
 Then select rough prompt text anywhere and press BOOT. If nothing is selected, the daemon falls back to the current clipboard text. If paste is blocked, the improved prompt remains on the clipboard.
 
+With current firmware, this action is triggered by a long BOOT press even when the daemon fallback action is `last-result`.
+
 ### Last Result Summary
 
 USB serial mode:
@@ -208,6 +215,8 @@ Wi-Fi mode:
 ```
 
 Then press BOOT. The daemon reads the last response saved by the Codex `Stop` hook, compresses it to one 5-line OLED page, and sends it as a full-width note. The note hides the session/context bars while it is displayed.
+
+With current firmware, this action is triggered by a short BOOT press.
 
 Generated summaries are cached in `/tmp/codex_pet_last_summary.json`, so pressing BOOT repeatedly for the same Codex result reuses the existing summary instead of calling Codex again.
 
@@ -246,16 +255,16 @@ Restart the daemon after changing permissions.
 
 ### Prompt Improver Test
 
-1. Run `./tools/prompt_button_daemon.py --button-action improve`.
+1. Run `./tools/prompt_button_daemon.py --button-action last-result`.
 2. Select this text in any editable field: `fix this`.
-3. Press the ESP32-C3 BOOT button.
+3. Long-press the ESP32-C3 BOOT button for about 1 second.
 4. The OLED should enter thinking mode.
 5. The selected text should be replaced with a clearer prompt.
 
 ### Last Result Test
 
 1. Run `./tools/prompt_button_daemon.py --button-action last-result`.
-2. Press the ESP32-C3 BOOT button.
+2. Short-press the ESP32-C3 BOOT button.
 3. The OLED should show a concise one-page summary of the latest Codex result for about 5 seconds.
 
 ## Useful Commands

@@ -9,7 +9,7 @@ import tempfile
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import quote_plus, urlparse
+from urllib.parse import parse_qs, quote_plus, urlparse
 from urllib.request import urlopen
 
 
@@ -306,13 +306,18 @@ def handle_button(fd, action):
 def start_http_server(http_port, pet_target, button_action):
     class ButtonHandler(BaseHTTPRequestHandler):
         def do_GET(self):
-            path = urlparse(self.path).path
+            parsed = urlparse(self.path)
+            path = parsed.path
             if path not in ("/", "/button"):
                 self.send_response(404)
                 self.end_headers()
                 return
             if path == "/button":
-                threading.Thread(target=handle_button, args=(pet_target, button_action), daemon=True).start()
+                query = parse_qs(parsed.query)
+                action = query.get("action", [button_action])[0]
+                if action not in ("improve", "last-result"):
+                    action = button_action
+                threading.Thread(target=handle_button, args=(pet_target, action), daemon=True).start()
                 body = b"button accepted\n"
             else:
                 body = b"codex pet button daemon\n"
@@ -378,7 +383,9 @@ def main():
                 line, buffer = buffer.split(b"\n", 1)
                 text = line.decode("utf-8", errors="replace").strip()
                 if text == "button:prompt_improve":
-                    handle_button(fd, args.button_action)
+                    handle_button(fd, "improve")
+                elif text == "button:last_result":
+                    handle_button(fd, "last-result")
     finally:
         os.close(fd)
 
