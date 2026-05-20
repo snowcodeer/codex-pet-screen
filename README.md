@@ -15,10 +15,10 @@ pio run -e codex-pet-screen -t upload
 
 Keep `prompt_button_daemon.py` running while you use the BOOT button. By default, selecting rough prompt text and pressing BOOT improves it and pastes it back. You can also run the button in `last-result` mode to show a short summary of the latest Codex response on the OLED.
 
-To make the pet react to Codex prompt start/finish events in this repo, launch Codex with:
+To make the pet react to Codex prompt start/finish events, restart Codex after setting up hooks.
 
 ```sh
-CODEX_PET_HOOK=1 codex
+codex
 ```
 
 ## Wi-Fi Mode
@@ -72,10 +72,10 @@ CODEX_PET_HOST=http://codex-pet-screen.local ./tools/codex_pet.py usage 30 12
 CODEX_PET_HOST=http://codex-pet-screen.local ./tools/codex_pet.py note "LAST RESULT\nBuild passed\nPushed to main"
 ```
 
-Enable Codex hooks over Wi-Fi:
+If you launch Codex from a shell and want to force a specific ESP host:
 
 ```sh
-CODEX_PET_HOOK=1 CODEX_PET_HOST=http://codex-pet-screen.local codex
+CODEX_PET_HOST=http://codex-pet-screen.local codex
 ```
 
 ## Hardware
@@ -105,24 +105,24 @@ Project-local hooks live in `.codex/hooks.json`.
 
 After cloning, restart Codex in this repo and run `/hooks` if Codex asks you to trust the hooks.
 
-### Hook Opt-in (recommended)
+### Hook Control
 
-To avoid these hooks interfering with other Codex instances, hooks in this project are now opt-in.
+Hooks are enabled by default. Set `CODEX_PET_HOOK=0` only when you want to temporarily disable the pet hooks for a Codex launch.
 
-- Enable the hooks only for the Codex instance you want to control by setting the environment variable `CODEX_PET_HOOK=1` before launching Codex or when invoking the hook scripts directly.
 - Example (test the prompt hook):
 
 ```bash
-CODEX_PET_HOOK=1 python3 tools/codex_pet_prompt_hook.py
+python3 tools/codex_pet_prompt_hook.py
 ```
 
 - Example (test the stop hook with JSON input):
 
 ```bash
-echo '{}' | CODEX_PET_HOOK=1 python3 tools/codex_pet_stop_hook.py
+echo '{}' | python3 tools/codex_pet_stop_hook.py
 ```
 
 - Logs for hook activity are written to `/tmp/codex_pet_hook.log`.
+- The button daemon writes the active Wi-Fi host to `/tmp/codex_pet_host`, so hooks can keep sending commands over Wi-Fi even when Codex was not launched with `CODEX_PET_HOST`.
 
 Notes:
 - On macOS, processes may be blocked from reading files in `~/Documents` or other protected locations by system privacy controls. If you see "Operation not permitted" when Codex invokes hooks, either grant Full Disk Access to the app that launches Codex (System Settings → Privacy & Security → Full Disk Access) or run Codex from a location that isn't protected (for example `/Users/Shared`).
@@ -180,7 +180,7 @@ Generated summaries are cached in `/tmp/codex_pet_last_summary.json`, so pressin
 This mode works best when Codex was launched with hooks enabled:
 
 ```sh
-CODEX_PET_HOOK=1 CODEX_PET_HOST=http://codex-pet-screen.local codex
+CODEX_PET_HOST=http://codex-pet-screen.local codex
 ```
 
 If there is no remembered Codex result yet, the daemon falls back to the latest git commit.

@@ -6,8 +6,7 @@ from pathlib import Path
 
 
 def main() -> int:
-    # Opt-in guard to avoid interfering with other Codex instances.
-    if os.environ.get("CODEX_PET_HOOK", "0") != "1":
+    if os.environ.get("CODEX_PET_HOOK", "1") == "0":
         try:
             with Path("/tmp/codex_pet_hook.log").open("a", encoding="utf-8") as f:
                 f.write("Prompt hook invoked but disabled by CODEX_PET_HOOK env\n")

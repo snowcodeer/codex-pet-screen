@@ -21,6 +21,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 USAGE_PATH = "/tmp/codex_pet_usage.json"
 LAST_RESULT_PATH = "/tmp/codex_pet_last_result.txt"
 LAST_SUMMARY_PATH = "/tmp/codex_pet_last_summary.json"
+PET_HOST_PATH = "/tmp/codex_pet_host"
 
 IMPROVER_INSTRUCTIONS = """Rewrite the selected text into a clearer, stronger prompt for Codex.
 
@@ -59,6 +60,16 @@ def send_pet_command(fd, command):
         elif fd is not None:
             os.write(fd, f"{command}\n".encode("utf-8"))
     except Exception:
+        pass
+
+
+def remember_pet_host(host):
+    if not host:
+        return
+    try:
+        with open(PET_HOST_PATH, "w", encoding="utf-8") as host_file:
+            host_file.write(host.strip() + "\n")
+    except OSError:
         pass
 
 
@@ -340,6 +351,7 @@ def main():
     args = parser.parse_args()
 
     pet_target = args.pet_host or None
+    remember_pet_host(args.pet_host)
     start_http_server(args.http_port, pet_target, args.button_action)
 
     if args.no_serial:

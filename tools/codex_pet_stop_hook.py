@@ -23,7 +23,7 @@ def log(message: str):
 
 
 def is_enabled() -> bool:
-    return os.environ.get("CODEX_PET_HOOK", "0") == "1"
+    return os.environ.get("CODEX_PET_HOOK", "1") != "0"
 
 
 def latest_usage_snapshot(transcript_path: Path):

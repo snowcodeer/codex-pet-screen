@@ -11,8 +11,18 @@ from urllib.request import urlopen
 
 
 DEFAULT_PORT = "/dev/cu.usbmodem101"
-DEFAULT_HOST = os.environ.get("CODEX_PET_HOST", "")
+HOST_CACHE = Path("/tmp/codex_pet_host")
 BAUD = "115200"
+
+
+def default_host() -> str:
+    host = os.environ.get("CODEX_PET_HOST", "").strip()
+    if host:
+        return host
+    try:
+        return HOST_CACHE.read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
 
 
 def _lock_path_for_port(port: str) -> Path:
@@ -109,8 +119,8 @@ def main() -> int:
     parser.add_argument("--port", default=DEFAULT_PORT, help=f"Serial port, default {DEFAULT_PORT}.")
     parser.add_argument(
         "--host",
-        default=DEFAULT_HOST,
-        help="ESP32 HTTP host/IP. Can also be set with CODEX_PET_HOST.",
+        default=default_host(),
+        help="ESP32 HTTP host/IP. Can also be set with CODEX_PET_HOST or cached by the button daemon.",
     )
     args = parser.parse_args()
 
