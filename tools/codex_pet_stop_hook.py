@@ -12,6 +12,7 @@ USAGE_PATH = Path("/tmp/codex_pet_usage.json")
 LAST_RESULT_PATH = Path("/tmp/codex_pet_last_result.txt")
 CUTE_SOUND = Path("/tmp/codex_pet_cute.wav")
 FALLBACK_DONE_SOUND = Path("/System/Library/Sounds/Purr.aiff")
+SESSIONS_DIR = Path.home() / ".codex" / "sessions"
 
 
 def log(message: str):
@@ -102,6 +103,24 @@ def previous_usage():
         return {"session": int(usage["session"]), "context": int(usage["context"])}
     except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError):
         return {}
+
+
+def find_transcript_path():
+    thread_id = os.environ.get("CODEX_THREAD_ID", "").strip()
+    try:
+        candidates = list(SESSIONS_DIR.glob("**/*.jsonl"))
+    except OSError:
+        return None
+
+    if thread_id:
+        for candidate in candidates:
+            if thread_id in candidate.name:
+                return candidate
+
+    try:
+        return max(candidates, key=lambda path: path.stat().st_mtime)
+    except (ValueError, OSError):
+        return None
 
 
 def latest_agent_message(transcript_path: Path):
@@ -226,12 +245,15 @@ def main() -> int:
         hook_input = {}
 
     transcript = hook_input.get("transcript_path")
-    if transcript:
-        transcript_path = Path(transcript)
+    transcript_path = Path(transcript) if transcript else find_transcript_path()
+    if not transcript_path:
+        log("No transcript path available for usage update")
+
+    if transcript_path:
         remember_last_result(transcript_path)
         usage = usage_from_event(latest_usage_snapshot(transcript_path), previous_usage())
         if usage:
-            log(f"Sending usage {usage[0]} {usage[1]}")
+            log(f"Sending usage {usage[0]} {usage[1]} from {transcript_path}")
             try:
                 USAGE_PATH.write_text(
                     json.dumps({"session": usage[0], "context": usage[1]}),
