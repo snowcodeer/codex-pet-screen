@@ -98,12 +98,12 @@ The default upload and monitor port is `/dev/cu.usbmodem101`.
 
 ## Codex Hooks
 
-Project-local hooks live in `.codex/hooks.json`.
+Hooks can be installed globally in `~/.codex/hooks.json` or project-locally in `.codex/hooks.json`. Use one scope at a time; if both files contain the pet hooks, Codex will run them twice.
 
 - `UserPromptSubmit`: sends `think` so the pet enters thinking mode.
 - `Stop`: updates usage bars, remembers the last Codex result, dances, and plays `/tmp/codex_pet_cute.wav`.
 
-After cloning, restart Codex in this repo and run `/hooks` if Codex asks you to trust the hooks.
+For this machine, global hooks are the recommended setup. After changing hook scope, restart Codex and run `/hooks` if Codex asks you to trust the hooks.
 
 ### Hook Control
 
@@ -132,6 +132,8 @@ Notes:
 
 You can configure any Codex project to use this same pet without copying the firmware project.
 
+Pick exactly one setup mode:
+
 Project-only setup:
 
 ```sh
@@ -150,6 +152,8 @@ Global setup for every Codex project:
 ```
 
 The setup command writes hook config that points back to this repo's hook scripts. It also caches the ESP host in `/tmp/codex_pet_host`, so Codex can reach the screen even when launched from VS Code or another app without `CODEX_PET_HOST`.
+
+To switch from project-only setup to global setup, delete the target project's `.codex/hooks.json` after running the global command. Keeping both hook files enabled will duplicate the thinking and stop animations.
 
 After setup, open Codex in the target project and run `/hooks` if Codex asks you to trust the hooks.
 
