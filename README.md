@@ -13,7 +13,7 @@ pio run -e codex-pet-screen -t upload
 ./tools/prompt_button_daemon.py
 ```
 
-Keep `prompt_button_daemon.py` running while you use the BOOT button. Select rough prompt text anywhere, press BOOT, and the improved prompt should be pasted into the active text field.
+Keep `prompt_button_daemon.py` running while you use the BOOT button. By default, selecting rough prompt text and pressing BOOT improves it and pastes it back. You can also run the button in `last-result` mode to show a short summary of the latest Codex response on the OLED.
 
 To make the pet react to Codex prompt start/finish events in this repo, launch Codex with:
 
@@ -48,19 +48,17 @@ Flash after creating the Wi-Fi config:
 pio run -e codex-pet-screen -t upload
 ```
 
-Run the laptop daemon in Wi-Fi mode with the default prompt-improver action:
+Run the laptop daemon in Wi-Fi mode with one of the button actions:
 
 ```sh
-./tools/prompt_button_daemon.py --no-serial --http-port 8765 --pet-host http://codex-pet-screen.local
+# Option 1: improve selected text and paste it back.
+./tools/prompt_button_daemon.py --no-serial --http-port 8765 --pet-host http://codex-pet-screen.local --button-action improve
+
+# Option 2: show the last Codex result on the OLED.
+./tools/prompt_button_daemon.py --no-serial --http-port 8765 --pet-host http://codex-pet-screen.local --button-action last-result
 ```
 
 If mDNS does not resolve, use the OLED-displayed IP address instead:
-
-```sh
-./tools/prompt_button_daemon.py --no-serial --http-port 8765 --pet-host http://192.168.0.123
-```
-
-To make BOOT show the last Codex result instead:
 
 ```sh
 ./tools/prompt_button_daemon.py --no-serial --http-port 8765 --pet-host http://192.168.0.123 --button-action last-result
@@ -130,46 +128,65 @@ Notes:
 - On macOS, processes may be blocked from reading files in `~/Documents` or other protected locations by system privacy controls. If you see "Operation not permitted" when Codex invokes hooks, either grant Full Disk Access to the app that launches Codex (System Settings → Privacy & Security → Full Disk Access) or run Codex from a location that isn't protected (for example `/Users/Shared`).
 - If you prefer per-instance hooks, configure a different hook path for each Codex installation instead of sharing this repository's hooks.
 
-## Prompt Button
+## Button Actions
 
-The prompt button is activated by running the laptop daemon:
+The BOOT button is activated by running the laptop daemon. The daemon has two actions:
+
+- `improve`: copies selected text, asks `codex exec` to rewrite it as a stronger prompt, puts the result on the clipboard, and pastes it into the active field.
+- `last-result`: summarizes the latest remembered Codex response and sends a short 3-5 line note to the OLED.
+
+The default action is `improve`.
+
+### Prompt Improver
+
+USB serial mode:
 
 ```sh
-./tools/prompt_button_daemon.py
+./tools/prompt_button_daemon.py --button-action improve
 ```
 
 If your ESP32-C3 uses a different serial port:
 
 ```sh
-./tools/prompt_button_daemon.py --port /dev/cu.usbmodem101
+./tools/prompt_button_daemon.py --port /dev/cu.usbmodem101 --button-action improve
 ```
 
-For Wi-Fi-only mode, use:
+Wi-Fi mode:
 
 ```sh
-./tools/prompt_button_daemon.py --no-serial --http-port 8765 --pet-host http://codex-pet-screen.local
+./tools/prompt_button_daemon.py --no-serial --http-port 8765 --pet-host http://codex-pet-screen.local --button-action improve
 ```
 
-To change what BOOT does, pass `--button-action`:
+Then select rough prompt text anywhere and press BOOT. If nothing is selected, the daemon falls back to the current clipboard text. If paste is blocked, the improved prompt remains on the clipboard.
+
+### Last Result Summary
+
+USB serial mode:
 
 ```sh
-# Improve selected text and paste it back.
-./tools/prompt_button_daemon.py --button-action improve
-
-# Show the last Codex result as a short OLED summary.
 ./tools/prompt_button_daemon.py --button-action last-result
 ```
 
-In Wi-Fi mode:
+Wi-Fi mode:
 
 ```sh
 ./tools/prompt_button_daemon.py --no-serial --http-port 8765 --pet-host http://codex-pet-screen.local --button-action last-result
 ```
 
+Then press BOOT. The daemon reads the last response saved by the Codex `Stop` hook, compresses it to fit the 128x64 OLED, and sends it as a full-width note.
+
+This mode works best when Codex was launched with hooks enabled:
+
+```sh
+CODEX_PET_HOOK=1 CODEX_PET_HOST=http://codex-pet-screen.local codex
+```
+
+If there is no remembered Codex result yet, the daemon falls back to the latest git commit.
+
 To keep it running in the background:
 
 ```sh
-nohup ./tools/prompt_button_daemon.py > /tmp/codex_pet_button.log 2>&1 &
+nohup ./tools/prompt_button_daemon.py --button-action last-result > /tmp/codex_pet_button.log 2>&1 &
 ```
 
 To stop the background daemon:
@@ -177,8 +194,6 @@ To stop the background daemon:
 ```sh
 pkill -f prompt_button_daemon.py
 ```
-
-Then press BOOT. With `--button-action improve`, the daemon copies the selection, asks `codex exec` to improve it, puts the improved prompt on the clipboard, and pastes it into the active field. With `--button-action last-result`, the daemon summarizes the latest remembered Codex response and sends it to the OLED.
 
 The daemon must stay running because the ESP32 sends button events to the laptop over USB serial or Wi-Fi HTTP. The ESP32 does not run Codex actions by itself.
 
@@ -193,15 +208,19 @@ Open System Settings and allow the terminal app running the daemon:
 
 Restart the daemon after changing permissions.
 
-### Prompt Button Test
+### Prompt Improver Test
 
-1. Run `./tools/prompt_button_daemon.py`.
+1. Run `./tools/prompt_button_daemon.py --button-action improve`.
 2. Select this text in any editable field: `fix this`.
 3. Press the ESP32-C3 BOOT button.
 4. The OLED should enter thinking mode.
 5. The selected text should be replaced with a clearer prompt.
 
-If nothing is selected, the daemon falls back to the current clipboard text. If paste is blocked, the improved prompt remains on the clipboard.
+### Last Result Test
+
+1. Run `./tools/prompt_button_daemon.py --button-action last-result`.
+2. Press the ESP32-C3 BOOT button.
+3. The OLED should show a compact summary of the latest Codex result.
 
 ## Useful Commands
 
