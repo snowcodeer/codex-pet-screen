@@ -93,8 +93,16 @@ def write_clipboard(text):
     run(["pbcopy"], input_text=text, timeout=5)
 
 
-def paste_clipboard():
-    script = 'tell application "System Events" to keystroke "v" using command down'
+def replace_field_with_clipboard():
+    script = """
+tell application "System Events"
+    keystroke "a" using command down
+    delay 0.05
+    key code 51
+    delay 0.05
+    keystroke "v" using command down
+end tell
+"""
     result = run(["osascript", "-e", script], timeout=5)
     return result.returncode == 0, result.stderr.strip()
 
@@ -280,7 +288,7 @@ def handle_improve_button(fd):
         return
 
     write_clipboard(improved)
-    pasted, paste_error = paste_clipboard()
+    pasted, paste_error = replace_field_with_clipboard()
     if pasted:
         send_pet_message(fd, "prompt pasted")
         print("Improved prompt pasted.")
