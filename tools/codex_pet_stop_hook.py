@@ -4,6 +4,7 @@ import math
 import wave
 import subprocess
 import sys
+import os
 from pathlib import Path
 
 LOG_PATH = Path("/tmp/codex_pet_hook.log")
@@ -18,6 +19,10 @@ def log(message: str):
             log_file.write(message + "\n")
     except OSError:
         pass
+
+
+def is_enabled() -> bool:
+    return os.environ.get("CODEX_PET_HOOK", "0") == "1"
 
 
 def latest_token_count(transcript_path: Path):
@@ -132,6 +137,14 @@ def play_done_sound():
 
 
 def main() -> int:
+    if not is_enabled():
+        try:
+            with LOG_PATH.open("a", encoding="utf-8") as log_file:
+                log_file.write("Stop hook invoked but disabled by CODEX_PET_HOOK env\n")
+        except OSError:
+            pass
+        return 0
+
     log("Stop hook invoked")
     try:
         hook_input = json.loads(sys.stdin.read() or "{}")
