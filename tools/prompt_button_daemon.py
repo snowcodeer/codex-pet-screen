@@ -5,10 +5,16 @@ import os
 import subprocess
 import sys
 import tempfile
+import threading
 import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import quote_plus, urlparse
+from urllib.request import urlopen
 
 
 DEFAULT_PORT = "/dev/cu.usbmodem101"
+DEFAULT_HTTP_PORT = 8765
+DEFAULT_PET_HOST = os.environ.get("CODEX_PET_HOST", "")
 BAUD = "115200"
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 USAGE_PATH = "/tmp/codex_pet_usage.json"
@@ -36,15 +42,19 @@ def configure_port(port):
 
 
 def send_pet_message(fd, message):
-    try:
-        os.write(fd, f"msg {message[:60]}\n".encode("utf-8"))
-    except Exception:
-        pass
+    send_pet_command(fd, f"msg {message[:60]}")
 
 
 def send_pet_command(fd, command):
     try:
-        os.write(fd, f"{command}\n".encode("utf-8"))
+        if isinstance(fd, str) and fd:
+            base = fd.rstrip("/")
+            if not base.startswith(("http://", "https://")):
+                base = "http://" + base
+            with urlopen(f"{base}/cmd?c={quote_plus(command)}", timeout=3) as response:
+                response.read()
+        elif fd is not None:
+            os.write(fd, f"{command}\n".encode("utf-8"))
     except Exception:
         pass
 
@@ -157,10 +167,57 @@ def handle_button(fd):
         print(f"Improved prompt copied, but paste failed: {paste_error}", file=sys.stderr)
 
 
+def start_http_server(http_port, pet_target):
+    class ButtonHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            path = urlparse(self.path).path
+            if path not in ("/", "/button"):
+                self.send_response(404)
+                self.end_headers()
+                return
+            if path == "/button":
+                threading.Thread(target=handle_button, args=(pet_target,), daemon=True).start()
+                body = b"button accepted\n"
+            else:
+                body = b"codex pet button daemon\n"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, _format, *args):
+            return
+
+    server = ThreadingHTTPServer(("0.0.0.0", http_port), ButtonHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    print(f"HTTP button listener on http://0.0.0.0:{http_port}/button")
+    return server
+
+
 def main():
     parser = argparse.ArgumentParser(description="Listen for ESP32 button events and improve selected prompts.")
     parser.add_argument("--port", default=DEFAULT_PORT)
+    parser.add_argument("--no-serial", action="store_true", help="Do not open the USB serial port.")
+    parser.add_argument("--http-port", type=int, default=DEFAULT_HTTP_PORT)
+    parser.add_argument(
+        "--pet-host",
+        default=DEFAULT_PET_HOST,
+        help="ESP32 HTTP host/IP for status messages. Can also be set with CODEX_PET_HOST.",
+    )
     args = parser.parse_args()
+
+    pet_target = args.pet_host or None
+    start_http_server(args.http_port, pet_target)
+
+    if args.no_serial:
+        print("Serial listener disabled. Press Ctrl-C to stop.")
+        try:
+            while True:
+                time.sleep(3600)
+        except KeyboardInterrupt:
+            return
 
     configure_port(args.port)
     print(f"Listening on {args.port}. Select text, then press BOOT.")

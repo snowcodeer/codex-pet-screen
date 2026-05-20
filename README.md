@@ -21,6 +21,58 @@ To make the pet react to Codex prompt start/finish events in this repo, launch C
 CODEX_PET_HOOK=1 codex
 ```
 
+## Wi-Fi Mode
+
+Wi-Fi mode lets the OLED screen work without USB serial after flashing. The ESP32 hosts a tiny HTTP API, and the laptop daemon hosts a tiny HTTP callback for BOOT button events.
+
+Copy the example config and fill in your local network details:
+
+```sh
+cp include/wifi_config.example.h include/wifi_config.h
+```
+
+Edit `include/wifi_config.h`:
+
+```c
+#define CODEX_PET_WIFI_SSID "your-wifi-name"
+#define CODEX_PET_WIFI_PASSWORD "your-wifi-password"
+#define CODEX_PET_BUTTON_URL "http://YOUR_LAPTOP_LAN_IP:8765/button"
+#define CODEX_PET_MDNS_NAME "codex-pet-screen"
+```
+
+`include/wifi_config.h` is ignored by git so credentials are not committed.
+
+Flash after creating the Wi-Fi config:
+
+```sh
+pio run -e codex-pet-screen -t upload
+```
+
+Run the laptop daemon in Wi-Fi mode:
+
+```sh
+./tools/prompt_button_daemon.py --no-serial --http-port 8765 --pet-host http://codex-pet-screen.local
+```
+
+If mDNS does not resolve, use the OLED-displayed IP address instead:
+
+```sh
+./tools/prompt_button_daemon.py --no-serial --http-port 8765 --pet-host http://192.168.0.123
+```
+
+Send commands over Wi-Fi:
+
+```sh
+CODEX_PET_HOST=http://codex-pet-screen.local ./tools/codex_pet.py dance
+CODEX_PET_HOST=http://codex-pet-screen.local ./tools/codex_pet.py usage 30 12
+```
+
+Enable Codex hooks over Wi-Fi:
+
+```sh
+CODEX_PET_HOOK=1 CODEX_PET_HOST=http://codex-pet-screen.local codex
+```
+
 ## Hardware
 
 - ESP32-C3 SuperMini
@@ -83,6 +135,12 @@ If your ESP32-C3 uses a different serial port:
 
 ```sh
 ./tools/prompt_button_daemon.py --port /dev/cu.usbmodem101
+```
+
+For Wi-Fi-only mode, use:
+
+```sh
+./tools/prompt_button_daemon.py --no-serial --http-port 8765 --pet-host http://codex-pet-screen.local
 ```
 
 To keep it running in the background:

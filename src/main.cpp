@@ -2,6 +2,17 @@
 #include <U8g2lib.h>
 #include <Wire.h>
 
+#if __has_include("wifi_config.h")
+#include "wifi_config.h"
+#include <ESPmDNS.h>
+#include <HTTPClient.h>
+#include <WebServer.h>
+#include <WiFi.h>
+#define CODEX_PET_WIFI_ENABLED 1
+#else
+#define CODEX_PET_WIFI_ENABLED 0
+#endif
+
 namespace {
 constexpr uint8_t kSdaPin = 3;
 constexpr uint8_t kSclPin = 4;
@@ -9,6 +20,17 @@ constexpr uint8_t kButtonPin = 0;
 constexpr uint32_t kBaud = 115200;
 
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C oled(U8G2_R0, U8X8_PIN_NONE);
+
+#if CODEX_PET_WIFI_ENABLED
+#ifndef CODEX_PET_MDNS_NAME
+#define CODEX_PET_MDNS_NAME "codex-pet-screen"
+#endif
+#ifndef CODEX_PET_BUTTON_URL
+#define CODEX_PET_BUTTON_URL ""
+#endif
+WebServer server(80);
+uint32_t lastWifiAttempt = 0;
+#endif
 
 String serialLine;
 String statusText = "waiting for codex";
@@ -188,6 +210,98 @@ void showMessage(String message) {
   oled.sendBuffer();
 }
 
+void handleCommand(String line);
+
+#if CODEX_PET_WIFI_ENABLED
+void sendHttpOk(const String &body = "ok") {
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  server.send(200, "text/plain", body);
+}
+
+void handleHttpRoot() {
+  String body = "codex-pet-screen\n";
+  body += "ip=" + WiFi.localIP().toString() + "\n";
+  body += "commands: /cmd?c=think, /cmd?c=dance, /cmd?c=usage%2030%2012\n";
+  sendHttpOk(body);
+}
+
+void handleHttpCmd() {
+  if (!server.hasArg("c")) {
+    server.send(400, "text/plain", "missing c");
+    return;
+  }
+  handleCommand(server.arg("c"));
+  sendHttpOk();
+}
+
+void handleHttpUsage() {
+  if (!server.hasArg("s") || !server.hasArg("c")) {
+    server.send(400, "text/plain", "missing s or c");
+    return;
+  }
+  handleCommand("usage " + server.arg("s") + " " + server.arg("c"));
+  sendHttpOk();
+}
+
+void connectWifi() {
+  if (WiFi.status() == WL_CONNECTED) {
+    return;
+  }
+
+  WiFi.mode(WIFI_STA);
+  WiFi.setHostname(CODEX_PET_MDNS_NAME);
+  WiFi.begin(CODEX_PET_WIFI_SSID, CODEX_PET_WIFI_PASSWORD);
+  lastWifiAttempt = millis();
+}
+
+void setupWifiServer() {
+  connectWifi();
+  const uint32_t start = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - start < 8000) {
+    delay(100);
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    MDNS.begin(CODEX_PET_MDNS_NAME);
+    server.on("/", handleHttpRoot);
+    server.on("/cmd", handleHttpCmd);
+    server.on("/usage", handleHttpUsage);
+    server.begin();
+    showMessage("wifi " + WiFi.localIP().toString());
+    delay(900);
+  }
+}
+
+void serviceWifi() {
+  if (WiFi.status() == WL_CONNECTED) {
+    server.handleClient();
+    return;
+  }
+
+  if (millis() - lastWifiAttempt > 10000) {
+    connectWifi();
+  }
+}
+
+void notifyButtonCallback() {
+  const char *url = CODEX_PET_BUTTON_URL;
+  if (WiFi.status() != WL_CONNECTED || url[0] == '\0') {
+    return;
+  }
+
+  HTTPClient http;
+  http.setTimeout(1200);
+  if (http.begin(url)) {
+    http.GET();
+    http.end();
+  }
+}
+#else
+void setupWifiServer() {}
+void serviceWifi() {}
+void notifyButtonCallback() {}
+#endif
+
 void handleCommand(String line) {
   line.trim();
   String command = line;
@@ -227,9 +341,12 @@ void setup() {
   oled.setPowerSave(0);
   oled.setContrast(180);
   renderIdle();
+  setupWifiServer();
 }
 
 void loop() {
+  serviceWifi();
+
   while (Serial.available() > 0) {
     const char c = static_cast<char>(Serial.read());
     if (c == '\n' || c == '\r') {
@@ -244,6 +361,7 @@ void loop() {
   if (lastButtonState == HIGH && buttonState == LOW) {
     Serial.println("button:prompt_improve");
     showThinking();
+    notifyButtonCallback();
   }
   lastButtonState = buttonState;
 

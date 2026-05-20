@@ -6,9 +6,12 @@ import sys
 import time
 import fcntl
 from pathlib import Path
+from urllib.parse import quote_plus
+from urllib.request import urlopen
 
 
 DEFAULT_PORT = "/dev/cu.usbmodem101"
+DEFAULT_HOST = os.environ.get("CODEX_PET_HOST", "")
 BAUD = "115200"
 
 
@@ -24,6 +27,20 @@ def configure_port(port: str) -> None:
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
+
+
+def send_http_command(host: str, command: str) -> int:
+    base = host.rstrip("/")
+    if not base.startswith(("http://", "https://")):
+        base = "http://" + base
+    url = f"{base}/cmd?c={quote_plus(command.strip())}"
+    try:
+        with urlopen(url, timeout=3) as response:
+            response.read()
+        return 0
+    except OSError as exc:
+        print(f"Could not send HTTP command to {base}: {exc}", file=sys.stderr)
+        return 1
 
 
 def send_command(port: str, command: str) -> int:
@@ -90,9 +107,17 @@ def main() -> int:
         help="Command to send: dance, think, idle, or msg <text>.",
     )
     parser.add_argument("--port", default=DEFAULT_PORT, help=f"Serial port, default {DEFAULT_PORT}.")
+    parser.add_argument(
+        "--host",
+        default=DEFAULT_HOST,
+        help="ESP32 HTTP host/IP. Can also be set with CODEX_PET_HOST.",
+    )
     args = parser.parse_args()
 
     command = " ".join(args.command).strip() or "dance"
+    if args.host:
+        return send_http_command(args.host, command)
+
     result = send_command(args.port, command)
     return result
 
