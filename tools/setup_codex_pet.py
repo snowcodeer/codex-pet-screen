@@ -8,7 +8,12 @@ from pathlib import Path
 DEFAULT_PET_ROOT = Path(__file__).resolve().parents[1]
 HOST_CACHE = Path("/tmp/codex_pet_host")
 HOOK_INSTALL_DIR = Path.home() / ".codex" / "codex-pet-screen-hooks"
-HOOK_FILES = ("codex_pet.py", "codex_pet_prompt_hook.py", "codex_pet_stop_hook.py")
+HOOK_FILES = (
+    "codex_pet.py",
+    "codex_pet_prompt_hook.py",
+    "codex_pet_stop_hook.py",
+    "setup_codex_pet.py",
+)
 
 
 def install_hook_runtime(pet_root: Path):
@@ -20,6 +25,10 @@ def install_hook_runtime(pet_root: Path):
         shutil.copy2(source, destination)
         destination.chmod(0o755)
     return HOOK_INSTALL_DIR
+
+
+def installed_runtime_exists():
+    return all((HOOK_INSTALL_DIR / name).exists() for name in HOOK_FILES[:3])
 
 
 def hook_config(hook_dir: Path):
@@ -96,9 +105,14 @@ def main():
     args = parser.parse_args()
 
     pet_root = Path(args.pet_root).expanduser().resolve()
-    if not (pet_root / "tools" / "codex_pet.py").exists():
-        raise SystemExit(f"Could not find codex_pet.py under {pet_root}")
-    hook_dir = install_hook_runtime(pet_root)
+    if (pet_root / "tools" / "codex_pet.py").exists():
+        hook_dir = install_hook_runtime(pet_root)
+    elif installed_runtime_exists():
+        hook_dir = HOOK_INSTALL_DIR
+    else:
+        raise SystemExit(
+            f"Could not find codex_pet.py under {pet_root} and no installed runtime exists at {HOOK_INSTALL_DIR}"
+        )
 
     if args.scope == "global":
         hook_path = Path.home() / ".codex" / "hooks.json"

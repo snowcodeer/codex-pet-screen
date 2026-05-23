@@ -11,7 +11,13 @@ Use this skill when the user wants a project to drive a Codex Pet Screen: thinki
 
 ## Workflow
 
-1. Locate the `codex-pet-screen` repository. Prefer the user's provided path. Common local path:
+1. Locate the installed hook runtime. Prefer this unprotected path because Codex sessions launched from Terminal may not be able to read repos under `~/Documents`:
+
+   ```sh
+   /Users/nataliechan/.codex/codex-pet-screen-hooks
+   ```
+
+   If the installed runtime is missing, locate the `codex-pet-screen` repository. Common local path:
 
    ```sh
    /Users/nataliechan/Documents/PlatformIO/Projects/codex-pet-screen
@@ -20,25 +26,25 @@ Use this skill when the user wants a project to drive a Codex Pet Screen: thinki
 2. Confirm the ESP is reachable. Prefer Wi-Fi if configured:
 
    ```sh
-   <pet-root>/tools/codex_pet.py --host http://codex-pet-screen.local think
+   /Users/nataliechan/.codex/codex-pet-screen-hooks/codex_pet.py --host http://codex-pet-screen.local think
    ```
 
    If mDNS fails, use the device IP:
 
    ```sh
-   <pet-root>/tools/codex_pet.py --host http://192.168.0.197 think
+   /Users/nataliechan/.codex/codex-pet-screen-hooks/codex_pet.py --host http://192.168.0.197 think
    ```
 
 3. Install hooks into the target project. Prefer project scope so the pet is opt-in for this workspace. This updates `UserPromptSubmit` and `Stop` while preserving unrelated hook events:
 
    ```sh
-   <pet-root>/tools/setup_codex_pet.py --scope project --target <target-project> --host http://<esp-ip-or-mdns>
+   /Users/nataliechan/.codex/codex-pet-screen-hooks/setup_codex_pet.py --scope project --target <target-project> --host http://<esp-ip-or-mdns>
    ```
 
    Use `--scope global` only if the user explicitly wants every Codex project to use the pet:
 
    ```sh
-   <pet-root>/tools/setup_codex_pet.py --scope global --host http://<esp-ip-or-mdns>
+   /Users/nataliechan/.codex/codex-pet-screen-hooks/setup_codex_pet.py --scope global --host http://<esp-ip-or-mdns>
    ```
 
 4. Start the button daemon if the user wants BOOT button support:
@@ -57,8 +63,8 @@ Use this skill when the user wants a project to drive a Codex Pet Screen: thinki
 6. Verify:
 
    ```sh
-   <pet-root>/tools/codex_pet.py think
-   <pet-root>/tools/codex_pet.py dance
+   /Users/nataliechan/.codex/codex-pet-screen-hooks/codex_pet.py think
+   /Users/nataliechan/.codex/codex-pet-screen-hooks/codex_pet.py dance
    ```
 
    Then send a Codex prompt in the target project. The OLED should enter thinking mode and dance/update when the response finishes.
@@ -66,6 +72,7 @@ Use this skill when the user wants a project to drive a Codex Pet Screen: thinki
 ## Notes
 
 - Prefer project scope. `setup_codex_pet.py` writes `.codex/hooks.json` for project scope or `~/.codex/hooks.json` for global scope.
+- The installed runtime path is `~/.codex/codex-pet-screen-hooks`; use it before falling back to the firmware repo path.
 - The ESP host is cached in `/tmp/codex_pet_host` so hooks work even when Codex was not launched with `CODEX_PET_HOST`.
 - Hook logs are in `/tmp/codex_pet_hook.log`.
 - The last-result button summary cache is `/tmp/codex_pet_last_summary.json`.
