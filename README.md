@@ -6,20 +6,49 @@ The pet lives on a 128x64 OLED, reacts to Codex hooks, shows session/context usa
 
 ## Quick Start
 
+Flash the firmware:
+
 ```sh
 git clone https://github.com/snowcodeer/codex-pet-screen.git
 cd codex-pet-screen
 pio run -e codex-pet-screen -t upload
-./tools/prompt_button_daemon.py
 ```
 
-Keep `prompt_button_daemon.py` running while you use the BOOT button. By default, selecting rough prompt text and pressing BOOT improves it and pastes it back. You can also run the button in `last-result` mode to show a short summary of the latest Codex response on the OLED.
-
-To make the pet react to Codex prompt start/finish events, restart Codex after setting up hooks.
+Install the reusable hook runtime and skill:
 
 ```sh
+./tools/setup_codex_pet.py --scope project --target "$PWD" --serial
+mkdir -p ~/.codex/skills
+rm -rf ~/.codex/skills/codex-pet-screen
+cp -R skills/codex-pet-screen ~/.codex/skills/
+```
+
+Activate the pet in any Codex project, with the ESP plugged into USB:
+
+```sh
+cd /path/to/project
+~/.codex/codex-pet-screen-hooks/setup_codex_pet.py --scope project --target "$PWD" --serial
 codex
 ```
+
+For Wi-Fi instead of USB, replace `--serial` with `--host http://YOUR_ESP_IP`.
+
+Or ask Codex from inside that project:
+
+```text
+Use the codex-pet-screen skill to set up this repo with my OLED pet.
+```
+
+For BOOT button actions, keep the laptop daemon running:
+
+```sh
+cd /path/to/codex-pet-screen
+./tools/prompt_button_daemon.py --port /dev/cu.usbmodem101 --button-action last-result
+```
+
+Short BOOT press shows the last Codex result summary. Long BOOT press improves selected text and pastes it back.
+
+After adding hooks to a project, restart/reopen Codex and run `/hooks` if Codex asks you to trust them.
 
 ## Wi-Fi Mode
 
