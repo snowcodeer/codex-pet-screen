@@ -5,6 +5,8 @@ import wave
 import subprocess
 import sys
 import os
+import tempfile
+import time
 from pathlib import Path
 
 LOG_PATH = Path("/tmp/codex_pet_hook.log")
@@ -229,22 +231,12 @@ def play_done_sound():
         log(f"Could not play fallback sound: {exc}")
 
 
-def main() -> int:
-    if not is_enabled():
-        try:
-            with LOG_PATH.open("a", encoding="utf-8") as log_file:
-                log_file.write("Stop hook invoked but disabled by CODEX_PET_HOOK env\n")
-        except OSError:
-            pass
-        return 0
-
-    log("Stop hook invoked")
+def run_stop_work(hook_input):
+    log("Stop hook worker invoked")
     try:
-        hook_input = json.loads(sys.stdin.read() or "{}")
-    except json.JSONDecodeError:
-        hook_input = {}
-
-    transcript = hook_input.get("transcript_path")
+        transcript = hook_input.get("transcript_path")
+    except AttributeError:
+        transcript = None
     transcript_path = Path(transcript) if transcript else find_transcript_path()
     if not transcript_path:
         log("No transcript path available for usage update")
@@ -266,6 +258,61 @@ def main() -> int:
     log("Sending dance")
     send_pet("dance")
     play_done_sound()
+
+
+def queue_stop_work(raw_input: str):
+    work_path = Path(tempfile.gettempdir()) / f"codex_pet_stop_{os.getpid()}_{int(time.time() * 1000)}.json"
+    try:
+        work_path.write_text(raw_input or "{}", encoding="utf-8")
+    except OSError as exc:
+        log(f"Could not queue stop hook input: {exc}")
+        return
+
+    env = os.environ.copy()
+    env["CODEX_PET_STOP_WORKER"] = "1"
+    try:
+        subprocess.Popen(
+            [sys.executable, str(Path(__file__)), "--worker", str(work_path)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            stdin=subprocess.DEVNULL,
+            env=env,
+            close_fds=True,
+            start_new_session=True,
+        )
+        log("Stop hook queued worker")
+    except OSError as exc:
+        log(f"Could not start stop hook worker: {exc}")
+
+
+def main() -> int:
+    if not is_enabled():
+        try:
+            with LOG_PATH.open("a", encoding="utf-8") as log_file:
+                log_file.write("Stop hook invoked but disabled by CODEX_PET_HOOK env\n")
+        except OSError:
+            pass
+        return 0
+
+    if len(sys.argv) == 3 and sys.argv[1] == "--worker":
+        work_path = Path(sys.argv[2])
+        try:
+            raw_input = work_path.read_text(encoding="utf-8")
+        except OSError:
+            raw_input = "{}"
+        try:
+            work_path.unlink()
+        except OSError:
+            pass
+        try:
+            hook_input = json.loads(raw_input or "{}")
+        except json.JSONDecodeError:
+            hook_input = {}
+        run_stop_work(hook_input)
+        return 0
+
+    log("Stop hook invoked")
+    queue_stop_work(sys.stdin.read())
     return 0
 
 

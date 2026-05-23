@@ -17,11 +17,13 @@ def main() -> int:
     sys.stdin.read()
     script = Path(__file__).with_name("codex_pet.py")
     try:
-        subprocess.run(
+        subprocess.Popen(
             [str(script), "think"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            check=False,
+            stdin=subprocess.DEVNULL,
+            close_fds=True,
+            start_new_session=True,
         )
     except OSError:
         try:
