@@ -28,6 +28,23 @@ Do not search for the firmware repo, scan subnets, inspect ARP, or run `git stat
 
    If `P` is nonempty, use USB serial. Do not test Wi-Fi first.
 
+   If the user explicitly wants Wi-Fi setup, ask for any missing fields before editing firmware config:
+
+   - Wi-Fi SSID
+   - Wi-Fi password
+   - laptop LAN IP for `CODEX_PET_BUTTON_URL`, for example `http://<laptop-ip>:8765/button`
+   - ESP host/IP after flashing, for example `http://codex-pet-screen.local` or `http://<esp-ip>`
+
+   Then update `include/wifi_config.h` in the firmware repo with:
+
+   ```c
+   #define CODEX_PET_WIFI_SSID "..."
+   #define CODEX_PET_WIFI_PASSWORD "..."
+   #define CODEX_PET_BUTTON_URL "http://<laptop-ip>:8765/button"
+   ```
+
+   Flash the firmware, then install hooks with `--host <esp-host>`.
+
 3. Install project-local hooks.
 
    USB serial:
@@ -60,3 +77,4 @@ Do not search for the firmware repo, scan subnets, inspect ARP, or run `git stat
 - If USB verification fails with `Port busy`, wait briefly and retry once.
 - If Wi-Fi verification fails, do not scan the network. Tell the user setup is installed but the pet is unreachable.
 - Button daemon setup is separate. Only start it if the user asks for BOOT button support.
+- Do not print, commit, or copy real Wi-Fi credentials into tracked files. `include/wifi_config.h` is local-only and ignored by git.

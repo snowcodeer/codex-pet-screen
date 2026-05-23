@@ -31,7 +31,28 @@ cd /path/to/project
 codex
 ```
 
-For Wi-Fi instead of USB, replace `--serial` with `--host http://YOUR_ESP_IP`.
+For Wi-Fi instead of USB, create `include/wifi_config.h`, flash again, then use the ESP host:
+
+```sh
+cp include/wifi_config.example.h include/wifi_config.h
+```
+
+Edit these fields:
+
+```c
+#define CODEX_PET_WIFI_SSID "YOUR_WIFI_NAME"
+#define CODEX_PET_WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
+#define CODEX_PET_BUTTON_URL "http://YOUR_LAPTOP_LAN_IP:8765/button"
+```
+
+Then:
+
+```sh
+pio run -e codex-pet-screen -t upload
+cd /path/to/project
+~/.codex/codex-pet-screen-hooks/setup_codex_pet.py --scope project --target "$PWD" --host http://YOUR_ESP_IP
+codex
+```
 
 Or ask Codex from inside that project:
 
@@ -63,8 +84,8 @@ cp include/wifi_config.example.h include/wifi_config.h
 Edit `include/wifi_config.h`:
 
 ```c
-#define CODEX_PET_WIFI_SSID "your-wifi-name"
-#define CODEX_PET_WIFI_PASSWORD "your-wifi-password"
+#define CODEX_PET_WIFI_SSID "YOUR_WIFI_NAME"
+#define CODEX_PET_WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
 #define CODEX_PET_BUTTON_URL "http://YOUR_LAPTOP_LAN_IP:8765/button"
 #define CODEX_PET_MDNS_NAME "codex-pet-screen"
 ```
