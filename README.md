@@ -132,12 +132,21 @@ Notes:
 
 You can configure any Codex project to use this same pet without copying the firmware project.
 
-Pick exactly one setup mode:
+Pick exactly one setup mode. USB serial is the simplest when the board is plugged into the laptop.
 
-Project-only setup:
+Project-only setup, USB serial:
 
 ```sh
-/Users/nataliechan/Documents/PlatformIO/Projects/codex-pet-screen/tools/setup_codex_pet.py \
+/Users/nataliechan/.codex/codex-pet-screen-hooks/setup_codex_pet.py \
+  --scope project \
+  --target /path/to/other/project \
+  --serial
+```
+
+Project-only setup, Wi-Fi:
+
+```sh
+/Users/nataliechan/.codex/codex-pet-screen-hooks/setup_codex_pet.py \
   --scope project \
   --target /path/to/other/project \
   --host http://192.168.0.197
@@ -146,12 +155,12 @@ Project-only setup:
 Global setup for every Codex project, only if you intentionally want the pet everywhere:
 
 ```sh
-/Users/nataliechan/Documents/PlatformIO/Projects/codex-pet-screen/tools/setup_codex_pet.py \
+/Users/nataliechan/.codex/codex-pet-screen-hooks/setup_codex_pet.py \
   --scope global \
   --host http://192.168.0.197
 ```
 
-The setup command copies the hook runtime to `~/.codex/codex-pet-screen-hooks`, writes hook config that points there, and caches the ESP host in `/tmp/codex_pet_host`. This keeps hooks readable from terminal-launched Codex sessions even when the firmware repo lives under `~/Documents`.
+The setup command copies the hook runtime to `~/.codex/codex-pet-screen-hooks`, writes hook config that points there, and either caches the ESP host in `/tmp/codex_pet_host` for Wi-Fi or clears it for `--serial`. This keeps hooks readable from terminal-launched Codex sessions even when the firmware repo lives under `~/Documents`.
 
 To switch from global setup to project-only setup, delete `~/.codex/hooks.json` and run the project-only command in the workspace where you want the pet. Keeping both hook files enabled will duplicate the thinking and stop animations.
 

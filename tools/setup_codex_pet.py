@@ -102,7 +102,15 @@ def main():
         default="",
         help="Optional ESP HTTP host, for example http://192.168.0.197.",
     )
+    parser.add_argument(
+        "--serial",
+        action="store_true",
+        help="Use USB serial fallback by clearing any cached ESP HTTP host.",
+    )
     args = parser.parse_args()
+
+    if args.host and args.serial:
+        raise SystemExit("Use either --host for Wi-Fi or --serial for USB serial, not both.")
 
     pet_root = Path(args.pet_root).expanduser().resolve()
     if (pet_root / "tools" / "codex_pet.py").exists():
@@ -121,12 +129,19 @@ def main():
 
     write_hooks(hook_path, hook_dir)
 
-    if args.host:
+    if args.serial:
+        try:
+            HOST_CACHE.unlink()
+        except FileNotFoundError:
+            pass
+    elif args.host:
         HOST_CACHE.write_text(args.host.strip() + "\n", encoding="utf-8")
 
     print(f"Wrote hooks: {hook_path}")
     print(f"Installed hook runtime: {hook_dir}")
-    if args.host:
+    if args.serial:
+        print("Cleared cached ESP host for USB serial mode")
+    elif args.host:
         print(f"Cached ESP host: {args.host}")
     print("Open Codex in the target project and run /hooks if asked to trust the hooks.")
 

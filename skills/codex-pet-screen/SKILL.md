@@ -1,112 +1,62 @@
 ---
 name: codex-pet-screen
-description: Set up the Codex Pet Screen ESP32/OLED project in a chosen Codex workspace, including project-local hooks, Wi-Fi host caching, button daemon commands, and verification.
+description: Quickly activate the Codex Pet Screen ESP32/OLED in the current Codex workspace with project-local hooks, preferring USB serial when present and avoiding broad repo/network discovery.
 metadata:
-  short-description: Configure Codex Pet Screen hooks
+  short-description: Activate Codex Pet Screen
 ---
 
 # Codex Pet Screen Setup
 
-Use this skill when the user wants a project to drive a Codex Pet Screen: thinking animation on prompt submit, dance/sound/usage update on stop, and optional BOOT button actions.
+Use this skill when the user asks to activate, enable, or set up the OLED pet for the current Codex project.
 
-## Workflow
+## Fast Path
 
-1. Check the installed hook runtime first. Prefer this unprotected path because Codex sessions launched from Terminal may not be able to read repos under `~/Documents`:
+Do not search for the firmware repo, scan subnets, inspect ARP, or run `git status` unless the fast path fails.
 
-   ```sh
-   test -x /Users/nataliechan/.codex/codex-pet-screen-hooks/codex_pet.py
-   test -x /Users/nataliechan/.codex/codex-pet-screen-hooks/setup_codex_pet.py
-   ```
-
-   If the installed runtime is missing, locate the `codex-pet-screen` repository. Common local path:
+1. Use the installed runtime only:
 
    ```sh
-   /Users/nataliechan/Documents/PlatformIO/Projects/codex-pet-screen
+   R=/Users/nataliechan/.codex/codex-pet-screen-hooks
+   test -x "$R/setup_codex_pet.py" && test -x "$R/codex_pet.py"
    ```
 
-2. Inspect the target workspace before changing it:
+2. Choose transport with one cheap check:
 
    ```sh
-   test -f .codex/hooks.json && sed -n '1,220p' .codex/hooks.json || echo no_project_hooks
-   test -f /tmp/codex_pet_host && sed -n '1,20p' /tmp/codex_pet_host || echo no_cached_host
-   ls /dev/cu.usbmodem* /dev/cu.wchusbserial* 2>/dev/null || true
+   P=$(find /dev -maxdepth 1 \( -name 'cu.usbmodem*' -o -name 'cu.wchusbserial*' \) -print | head -1)
    ```
 
-   Preserve unrelated hook events if a project hook file already exists. If pet hooks are already present, update them instead of duplicating them.
+   If `P` is nonempty, use USB serial. Do not test Wi-Fi first.
 
-3. Confirm how the ESP is reachable. Prefer Wi-Fi when it works:
+3. Install project-local hooks.
+
+   USB serial:
 
    ```sh
-   /Users/nataliechan/.codex/codex-pet-screen-hooks/codex_pet.py --host http://codex-pet-screen.local think
+   "$R/setup_codex_pet.py" --scope project --target "$PWD" --serial
+   "$R/codex_pet.py" --port "$P" think
    ```
 
-   If mDNS fails, try the cached host from `/tmp/codex_pet_host`, then the known fallback IP:
+   Wi-Fi fallback, only when no USB serial device exists:
 
    ```sh
-   /Users/nataliechan/.codex/codex-pet-screen-hooks/codex_pet.py --host http://192.168.0.197 think
+   H=$(cat /tmp/codex_pet_host 2>/dev/null || printf 'http://192.168.0.197')
+   "$R/setup_codex_pet.py" --scope project --target "$PWD" --host "$H"
+   "$R/codex_pet.py" --host "$H" think
    ```
 
-   If Wi-Fi does not respond but `/dev/cu.usbmodem101` exists, use USB serial mode. In that case, run setup without `--host` so hooks use the serial fallback:
+4. Report concise status:
 
-   ```sh
-   /Users/nataliechan/.codex/codex-pet-screen-hooks/codex_pet.py --port /dev/cu.usbmodem101 think
-   ```
+   - hook file written at `.codex/hooks.json`
+   - transport used: USB serial path or Wi-Fi host
+   - live verification passed or failed
+   - run `/hooks` if Codex asks to trust project hooks
 
-4. Install hooks into the target project. Prefer project scope so the pet is opt-in for this workspace. This updates `UserPromptSubmit` and `Stop` while preserving unrelated hook events.
+## Guardrails
 
-   Wi-Fi setup:
-
-   ```sh
-   /Users/nataliechan/.codex/codex-pet-screen-hooks/setup_codex_pet.py --scope project --target <target-project> --host http://<esp-ip-or-mdns>
-   ```
-
-   USB serial setup:
-
-   ```sh
-   /Users/nataliechan/.codex/codex-pet-screen-hooks/setup_codex_pet.py --scope project --target <target-project>
-   ```
-
-   Use `--scope global` only if the user explicitly wants every Codex project to use the pet:
-
-   ```sh
-   /Users/nataliechan/.codex/codex-pet-screen-hooks/setup_codex_pet.py --scope global --host http://<esp-ip-or-mdns>
-   ```
-
-5. Start the button daemon if the user wants BOOT button support.
-
-   Wi-Fi mode:
-
-   ```sh
-   cd <pet-root>
-   ./tools/prompt_button_daemon.py --no-serial --http-port 8765 --pet-host http://<esp-ip-or-mdns> --button-action last-result
-   ```
-
-   USB serial mode:
-
-   ```sh
-   cd <pet-root>
-   ./tools/prompt_button_daemon.py --port /dev/cu.usbmodem101 --button-action last-result
-   ```
-
-   Use `--button-action improve` for selected-text prompt improvement.
-
-   Current firmware sends explicit button actions: short press shows `last-result`; long press, about 1 second, runs `improve`. The daemon's `--button-action` is only the fallback for older firmware or manual `/button` requests.
-
-6. Ask the user to open Codex in the target project and run `/hooks` if Codex asks for trust.
-
-7. Verify:
-
-   ```sh
-   /Users/nataliechan/.codex/codex-pet-screen-hooks/codex_pet.py think
-   /Users/nataliechan/.codex/codex-pet-screen-hooks/codex_pet.py dance
-   ```
-
-   Then send a Codex prompt in the target project. The OLED should enter thinking mode and dance/update when the response finishes.
-
-## Notes
-
-- Prefer project scope. `setup_codex_pet.py` writes `.codex/hooks.json` for project scope or `~/.codex/hooks.json` for global scope.
-- The installed runtime path is `~/.codex/codex-pet-screen-hooks`; use it before falling back to the firmware repo path.
-- The ESP host is cached in `/tmp/codex_pet_host` so hooks work even when Codex was not launched with `CODEX_PET_HOST`.
-- Hook logs are in `/tmp/codex_pet_hook.log`.
-- The last-result button summary cache is `/tmp/codex_pet_last_summary.json`.
+- Prefer project scope; use global hooks only if the user explicitly asks.
+- Preserve unrelated hook events; `setup_codex_pet.py` replaces only `UserPromptSubmit` and `Stop`.
+- If `.codex/hooks.json` already has pet hooks, rerun the installer instead of adding duplicates.
+- If USB verification fails with `Port busy`, wait briefly and retry once.
+- If Wi-Fi verification fails, do not scan the network. Tell the user setup is installed but the pet is unreachable.
+- Button daemon setup is separate. Only start it if the user asks for BOOT button support.

@@ -119,14 +119,16 @@ def main() -> int:
     parser.add_argument("--port", default=DEFAULT_PORT, help=f"Serial port, default {DEFAULT_PORT}.")
     parser.add_argument(
         "--host",
-        default=default_host(),
+        default=None,
         help="ESP32 HTTP host/IP. Can also be set with CODEX_PET_HOST or cached by the button daemon.",
     )
     args = parser.parse_args()
 
     command = " ".join(args.command).strip() or "dance"
-    if args.host:
-        return send_http_command(args.host, command)
+    port_explicit = any(arg == "--port" or arg.startswith("--port=") for arg in sys.argv[1:])
+    host = args.host if args.host is not None else ("" if port_explicit else default_host())
+    if host:
+        return send_http_command(host, command)
 
     result = send_command(args.port, command)
     return result
