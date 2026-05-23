@@ -1,6 +1,6 @@
 ---
 name: codex-pet-screen
-description: Set up the Codex Pet Screen ESP32/OLED project in another Codex workspace, including project or global hooks, Wi-Fi host caching, button daemon commands, and verification.
+description: Set up the Codex Pet Screen ESP32/OLED project in a chosen Codex workspace, including project-local hooks, Wi-Fi host caching, button daemon commands, and verification.
 metadata:
   short-description: Configure Codex Pet Screen hooks
 ---
@@ -29,13 +29,13 @@ Use this skill when the user wants a project to drive a Codex Pet Screen: thinki
    <pet-root>/tools/codex_pet.py --host http://192.168.0.197 think
    ```
 
-3. Install hooks into the target project. This updates `UserPromptSubmit` and `Stop` while preserving unrelated hook events:
+3. Install hooks into the target project. Prefer project scope so the pet is opt-in for this workspace. This updates `UserPromptSubmit` and `Stop` while preserving unrelated hook events:
 
    ```sh
    <pet-root>/tools/setup_codex_pet.py --scope project --target <target-project> --host http://<esp-ip-or-mdns>
    ```
 
-   Use `--scope global` only when the user wants every Codex project to use the pet:
+   Use `--scope global` only if the user explicitly wants every Codex project to use the pet:
 
    ```sh
    <pet-root>/tools/setup_codex_pet.py --scope global --host http://<esp-ip-or-mdns>
@@ -65,7 +65,7 @@ Use this skill when the user wants a project to drive a Codex Pet Screen: thinki
 
 ## Notes
 
-- `setup_codex_pet.py` writes `.codex/hooks.json` for project scope or `~/.codex/hooks.json` for global scope.
+- Prefer project scope. `setup_codex_pet.py` writes `.codex/hooks.json` for project scope or `~/.codex/hooks.json` for global scope.
 - The ESP host is cached in `/tmp/codex_pet_host` so hooks work even when Codex was not launched with `CODEX_PET_HOST`.
 - Hook logs are in `/tmp/codex_pet_hook.log`.
 - The last-result button summary cache is `/tmp/codex_pet_last_summary.json`.

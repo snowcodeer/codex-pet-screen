@@ -103,7 +103,7 @@ Hooks can be installed globally in `~/.codex/hooks.json` or project-locally in `
 - `UserPromptSubmit`: sends `think` so the pet enters thinking mode.
 - `Stop`: updates usage bars, remembers the last Codex result, dances, and plays `/tmp/codex_pet_cute.wav`.
 
-For this machine, global hooks are the recommended setup. After changing hook scope, restart Codex and run `/hooks` if Codex asks you to trust the hooks.
+Project-local hooks are the recommended setup because they make the pet opt-in per workspace. After changing hook scope, restart Codex and run `/hooks` if Codex asks you to trust the hooks.
 
 ### Hook Control
 
@@ -143,7 +143,7 @@ Project-only setup:
   --host http://192.168.0.197
 ```
 
-Global setup for every Codex project:
+Global setup for every Codex project, only if you intentionally want the pet everywhere:
 
 ```sh
 /Users/nataliechan/Documents/PlatformIO/Projects/codex-pet-screen/tools/setup_codex_pet.py \
@@ -153,7 +153,7 @@ Global setup for every Codex project:
 
 The setup command copies the hook runtime to `~/.codex/codex-pet-screen-hooks`, writes hook config that points there, and caches the ESP host in `/tmp/codex_pet_host`. This keeps hooks readable from terminal-launched Codex sessions even when the firmware repo lives under `~/Documents`.
 
-To switch from project-only setup to global setup, delete the target project's `.codex/hooks.json` after running the global command. Keeping both hook files enabled will duplicate the thinking and stop animations.
+To switch from global setup to project-only setup, delete `~/.codex/hooks.json` and run the project-only command in the workspace where you want the pet. Keeping both hook files enabled will duplicate the thinking and stop animations.
 
 After setup, open Codex in the target project and run `/hooks` if Codex asks you to trust the hooks.
 
