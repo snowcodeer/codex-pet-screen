@@ -1,15 +1,28 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import shutil
 from pathlib import Path
 
 
 DEFAULT_PET_ROOT = Path(__file__).resolve().parents[1]
 HOST_CACHE = Path("/tmp/codex_pet_host")
+HOOK_INSTALL_DIR = Path.home() / ".codex" / "codex-pet-screen-hooks"
+HOOK_FILES = ("codex_pet.py", "codex_pet_prompt_hook.py", "codex_pet_stop_hook.py")
 
 
-def hook_config(pet_root: Path):
-    tools = pet_root / "tools"
+def install_hook_runtime(pet_root: Path):
+    source_dir = pet_root / "tools"
+    HOOK_INSTALL_DIR.mkdir(parents=True, exist_ok=True)
+    for name in HOOK_FILES:
+        source = source_dir / name
+        destination = HOOK_INSTALL_DIR / name
+        shutil.copy2(source, destination)
+        destination.chmod(0o755)
+    return HOOK_INSTALL_DIR
+
+
+def hook_config(hook_dir: Path):
     return {
         "hooks": {
             "UserPromptSubmit": [
@@ -17,7 +30,7 @@ def hook_config(pet_root: Path):
                     "hooks": [
                         {
                             "type": "command",
-                            "command": str(tools / "codex_pet_prompt_hook.py"),
+                            "command": str(hook_dir / "codex_pet_prompt_hook.py"),
                             "timeout": 3,
                             "statusMessage": "Codex pet thinking",
                         }
@@ -29,7 +42,7 @@ def hook_config(pet_root: Path):
                     "hooks": [
                         {
                             "type": "command",
-                            "command": str(tools / "codex_pet_stop_hook.py"),
+                            "command": str(hook_dir / "codex_pet_stop_hook.py"),
                             "timeout": 5,
                             "statusMessage": "Dancing Codex pet",
                         }
@@ -47,10 +60,10 @@ def read_json(path: Path):
         return {}
 
 
-def write_hooks(path: Path, pet_root: Path):
+def write_hooks(path: Path, hook_dir: Path):
     data = read_json(path)
     hooks = data.setdefault("hooks", {})
-    pet_hooks = hook_config(pet_root)["hooks"]
+    pet_hooks = hook_config(hook_dir)["hooks"]
     hooks["UserPromptSubmit"] = pet_hooks["UserPromptSubmit"]
     hooks["Stop"] = pet_hooks["Stop"]
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -85,18 +98,20 @@ def main():
     pet_root = Path(args.pet_root).expanduser().resolve()
     if not (pet_root / "tools" / "codex_pet.py").exists():
         raise SystemExit(f"Could not find codex_pet.py under {pet_root}")
+    hook_dir = install_hook_runtime(pet_root)
 
     if args.scope == "global":
         hook_path = Path.home() / ".codex" / "hooks.json"
     else:
         hook_path = Path(args.target).expanduser().resolve() / ".codex" / "hooks.json"
 
-    write_hooks(hook_path, pet_root)
+    write_hooks(hook_path, hook_dir)
 
     if args.host:
         HOST_CACHE.write_text(args.host.strip() + "\n", encoding="utf-8")
 
     print(f"Wrote hooks: {hook_path}")
+    print(f"Installed hook runtime: {hook_dir}")
     if args.host:
         print(f"Cached ESP host: {args.host}")
     print("Open Codex in the target project and run /hooks if asked to trust the hooks.")

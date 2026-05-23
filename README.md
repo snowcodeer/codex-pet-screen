@@ -125,7 +125,7 @@ echo '{}' | python3 tools/codex_pet_stop_hook.py
 - The button daemon writes the active Wi-Fi host to `/tmp/codex_pet_host`, so hooks can keep sending commands over Wi-Fi even when Codex was not launched with `CODEX_PET_HOST`.
 
 Notes:
-- On macOS, processes may be blocked from reading files in `~/Documents` or other protected locations by system privacy controls. If you see "Operation not permitted" when Codex invokes hooks, either grant Full Disk Access to the app that launches Codex (System Settings → Privacy & Security → Full Disk Access) or run Codex from a location that isn't protected (for example `/Users/Shared`).
+- On macOS, processes may be blocked from reading files in `~/Documents` or other protected locations by system privacy controls. The setup helper avoids this by copying the small hook runtime to `~/.codex/codex-pet-screen-hooks` and pointing hooks there. If you still see "Operation not permitted", rerun the setup helper and restart Codex.
 - If you prefer per-instance hooks, configure a different hook path for each Codex installation instead of sharing this repository's hooks.
 
 ### Use From Another Project
@@ -151,7 +151,7 @@ Global setup for every Codex project:
   --host http://192.168.0.197
 ```
 
-The setup command writes hook config that points back to this repo's hook scripts. It also caches the ESP host in `/tmp/codex_pet_host`, so Codex can reach the screen even when launched from VS Code or another app without `CODEX_PET_HOST`.
+The setup command copies the hook runtime to `~/.codex/codex-pet-screen-hooks`, writes hook config that points there, and caches the ESP host in `/tmp/codex_pet_host`. This keeps hooks readable from terminal-launched Codex sessions even when the firmware repo lives under `~/Documents`.
 
 To switch from project-only setup to global setup, delete the target project's `.codex/hooks.json` after running the global command. Keeping both hook files enabled will duplicate the thinking and stop animations.
 
